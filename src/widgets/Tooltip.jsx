@@ -128,7 +128,7 @@ function Tooltip(props) {
           style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
         >
           {Content ? (
-            <Content data={getTaskObj(tooltipData)} />
+            <Content data={tooltipData} />
           ) : pos.text ? (
             <div className="wx-KG0Lwsqo wx-gantt-tooltip-text">{pos.text}</div>
           ) : null}
