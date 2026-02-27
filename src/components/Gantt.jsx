@@ -192,6 +192,43 @@ const Gantt = forwardRef(function Gantt(
     [dataStore, firstInRoute],
   );
 
+  // intercept set-scale to jump to a specific zoom level centered on a date
+  useEffect(() => {
+    api.intercept('set-scale', ({ unit, date }) => {
+      const { zoom } = api.getState();
+      if (!zoom || !zoom.levels) return false;
+
+      const levelIndex = zoom.levels.findIndex((l) =>
+        l.scales.some((s) => s.unit === unit),
+      );
+      if (levelIndex < 0) return false;
+
+      const level = zoom.levels[levelIndex];
+      const scaleChanged = levelIndex !== zoom.level;
+
+      if (scaleChanged) {
+        const newCellWidth = Math.round(
+          (level.minCellWidth + level.maxCellWidth) / 2,
+        );
+        const store = api.getStores().data;
+        store.setState({
+          scales: level.scales,
+          cellWidth: newCellWidth,
+          _cellWidth: newCellWidth,
+          zoom: { ...zoom, level: levelIndex },
+          ...(date ? { _scaleDate: date, _zoomOffset: 0 } : {}),
+        });
+      } else if (date) {
+        const { _scales, cellWidth: cw } = api.getState();
+        const diff = _scales.diff(date, _scales.start, _scales.lengthUnit);
+        const scrollLeft = Math.max(0, Math.round(diff * cw));
+        api.exec('scroll-chart', { left: scrollLeft });
+      }
+
+      return false;
+    });
+  }, [api]);
+
   // expose API via ref
   useImperativeHandle(
     ref,

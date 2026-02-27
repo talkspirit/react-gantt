@@ -15,6 +15,7 @@ import {
 
 import type {
   TMethodsConfig,
+  TLengthUnit,
   IApi,
   IConfig,
   ITask,
@@ -24,6 +25,11 @@ import type {
 export * from '@svar-ui/gantt-store';
 export { ICellProps } from '@svar-ui/react-grid';
 export { registerEditorItem } from '@svar-ui/react-editor';
+
+export interface ISetScaleConfig {
+  unit: TLengthUnit;
+  date?: Date;
+}
 
 export interface IColumnConfig extends Omit<IGanttColumn, 'header'> {
   cell?: ITableColumn['cell'];
@@ -44,7 +50,7 @@ export declare const Gantt: ForwardRefExoticComponent<
     highlightTime?: (date: Date, unit: 'day' | 'hour') => string;
     init?: (api: IApi) => void;
   } & IConfig &
-    GanttActions<TMethodsConfig> &
+    GanttActions<TMethodsConfig & { 'set-scale': ISetScaleConfig }> &
     RefAttributes<IApi>
 >;
 
