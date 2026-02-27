@@ -1,6 +1,9 @@
+import { useContext } from 'react';
+import storeContext from '../../context.js';
 import './TextCell.css';
 
 function TextCell({ row, column }) {
+  const api = useContext(storeContext);
   function getStyle(row, col) {
     return {
       justifyContent: col.align,
@@ -21,7 +24,7 @@ function TextCell({ row, column }) {
         <i className="wx-pqc08MHU wx-toggle-placeholder" />
       )}
       <div className="wx-pqc08MHU wx-text">
-        {CellComponent ? <CellComponent row={row} column={column} /> : row.text}
+        {CellComponent ? <CellComponent row={row} column={column} api={api} /> : row.text}
       </div>
     </div>
   );

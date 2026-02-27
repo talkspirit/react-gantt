@@ -173,7 +173,7 @@ const Gantt = forwardRef(function Gantt(
       getState: dataStore.getState.bind(dataStore),
       getReactiveState: dataStore.getReactive.bind(dataStore),
       getStores: () => ({ data: dataStore }),
-      exec: firstInRoute.exec,
+      exec: firstInRoute.exec.bind(firstInRoute),
       setNext: (ev) => {
         lastInRouteRef.current = lastInRouteRef.current.setNext(ev);
         return lastInRouteRef.current;
