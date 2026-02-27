@@ -1,5 +1,5 @@
 {
-  "name": "@svar-ui/react-gantt",
+  "name": "@talkspirit/react-gantt",
   "version": "2.5.2",
   "description": "A customizable, high-performance React Gantt chart component for building project timelines.",
   "productTag": "gantt",
