@@ -144,6 +144,7 @@ function Bars(props) {
       const task = api.getTask(id);
       const css = point.target.classList;
       if (point.target.closest('.wx-delete-button')) return;
+      if (point.target.closest('[data-interactive]')) return;
       if (!readonly) {
         if (css.contains('wx-progress-marker')) {
           const { progress } = api.getTask(id);
@@ -404,6 +405,7 @@ function Bars(props) {
   const onDblClick = useCallback(
     (e) => {
       if (!readonly) {
+        if (e.target.closest('[data-interactive]')) return;
         const id = locateID(e.target);
         if (id && !e.target.classList.contains('wx-link')) {
           const segmentIndex = locateID(e.target, 'data-segment');
@@ -452,6 +454,8 @@ function Bars(props) {
         ignoreNextClickRef.current = false;
         return;
       }
+
+      if (e.target.closest('[data-interactive]')) return;
 
       const id = locateID(e.target);
       if (id) {
@@ -681,7 +685,9 @@ function Bars(props) {
                       </div>
                     ) : null}
                     {TaskTemplate ? (
-                      <TaskTemplate data={task} api={api} onAction={forward} />
+                      <div className="wx-GKbcLEGA wx-content">
+                        <TaskTemplate data={task} api={api} onAction={forward} />
+                      </div>
                     ) : splitTasks && task.segments ? (
                       <BarSegments task={task} type={taskTypeCss(task.type)} />
                     ) : (

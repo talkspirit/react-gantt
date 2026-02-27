@@ -1,4 +1,10 @@
-import type { FC, ReactNode, ComponentProps } from 'react';
+import type {
+  FC,
+  ReactNode,
+  ComponentProps,
+  ForwardRefExoticComponent,
+  RefAttributes,
+} from 'react';
 import { ContextMenu as BaseContextMenu } from '@svar-ui/react-menu';
 import { Toolbar as BaseToolbar } from '@svar-ui/react-toolbar';
 import { Editor as BaseEditor } from '@svar-ui/react-editor';
@@ -9,6 +15,7 @@ import {
 
 import type {
   TMethodsConfig,
+  TLengthUnit,
   IApi,
   IConfig,
   ITask,
@@ -16,7 +23,18 @@ import type {
 } from '@svar-ui/gantt-store';
 
 export * from '@svar-ui/gantt-store';
+export { ICellProps } from '@svar-ui/react-grid';
 export { registerEditorItem } from '@svar-ui/react-editor';
+
+export interface ISetScaleConfig {
+  unit: TLengthUnit;
+  date?: Date;
+}
+
+export interface IScaleChangeConfig {
+  level: number;
+  unit: TLengthUnit;
+}
 
 export interface IColumnConfig extends Omit<IGanttColumn, 'header'> {
   cell?: ITableColumn['cell'];
@@ -24,7 +42,7 @@ export interface IColumnConfig extends Omit<IGanttColumn, 'header'> {
   editor?: ITableColumn['editor'];
 }
 
-export declare const Gantt: FC<
+export declare const Gantt: ForwardRefExoticComponent<
   {
     columns?: false | IColumnConfig[];
     taskTemplate?: FC<{
@@ -37,7 +55,13 @@ export declare const Gantt: FC<
     highlightTime?: (date: Date, unit: 'day' | 'hour') => string;
     init?: (api: IApi) => void;
   } & IConfig &
-    GanttActions<TMethodsConfig>
+    GanttActions<
+      TMethodsConfig & {
+        'set-scale': ISetScaleConfig;
+        'scale-change': IScaleChangeConfig;
+      }
+    > &
+    RefAttributes<IApi>
 >;
 
 export declare const HeaderMenu: FC<

@@ -173,7 +173,7 @@ const Gantt = forwardRef(function Gantt(
       getState: dataStore.getState.bind(dataStore),
       getReactiveState: dataStore.getReactive.bind(dataStore),
       getStores: () => ({ data: dataStore }),
-      exec: firstInRoute.exec,
+      exec: firstInRoute.exec.bind(firstInRoute),
       setNext: (ev) => {
         lastInRouteRef.current = lastInRouteRef.current.setNext(ev);
         return lastInRouteRef.current;
@@ -191,6 +191,57 @@ const Gantt = forwardRef(function Gantt(
     }),
     [dataStore, firstInRoute],
   );
+
+  // fire scale-change after any zoom-scale or set-scale action
+  useEffect(() => {
+    const emitScaleChange = () => {
+      const { zoom: z, scales: sc } = api.getState();
+      const level = z?.levels?.[z.level];
+      const unit = level?.scales?.[0]?.unit ?? sc?.[0]?.unit;
+      if (unit) {
+        api.exec('scale-change', { level: z?.level, unit });
+      }
+    };
+    api.on('zoom-scale', emitScaleChange);
+    api.on('set-scale', emitScaleChange);
+  }, [api]);
+
+  // intercept set-scale to jump to a specific zoom level centered on a date
+  useEffect(() => {
+    api.intercept('set-scale', ({ unit, date }) => {
+      const { zoom } = api.getState();
+      if (!zoom || !zoom.levels) return false;
+
+      const levelIndex = zoom.levels.findIndex((l) =>
+        l.scales.some((s) => s.unit === unit),
+      );
+      if (levelIndex < 0) return false;
+
+      const level = zoom.levels[levelIndex];
+      const scaleChanged = levelIndex !== zoom.level;
+
+      if (scaleChanged) {
+        const newCellWidth = Math.round(
+          (level.minCellWidth + level.maxCellWidth) / 2,
+        );
+        const store = api.getStores().data;
+        store.setState({
+          scales: level.scales,
+          cellWidth: newCellWidth,
+          _cellWidth: newCellWidth,
+          zoom: { ...zoom, level: levelIndex },
+          ...(date ? { _scaleDate: date, _zoomOffset: 0 } : {}),
+        });
+      } else if (date) {
+        const { _scales, cellWidth: cw } = api.getState();
+        const diff = _scales.diff(date, _scales.start, _scales.lengthUnit);
+        const scrollLeft = Math.max(0, Math.round(diff * cw));
+        api.exec('scroll-chart', { left: scrollLeft });
+      }
+
+      return false;
+    });
+  }, [api]);
 
   // expose API via ref
   useImperativeHandle(

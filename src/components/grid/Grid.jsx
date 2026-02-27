@@ -177,6 +177,14 @@ export default function Grid(props) {
         const text = header.text && _(header.text);
         col.header = { ...header, text };
       } else col.header = _(header);
+
+      // Wrap custom cell components so they receive the Gantt api
+      // instead of the grid's internal api
+      if (col.cell && col.id !== 'text' && col.id !== 'add-task') {
+        const OriginalCell = col.cell;
+        col.cell = (props) => <OriginalCell {...props} api={api} />;
+      }
+
       return col;
     });
     const ti = cols.findIndex((c) => c.id === 'text');
@@ -205,7 +213,7 @@ export default function Grid(props) {
 
     if (cols.length > 0) cols[cols.length - 1].resize = false;
     return cols;
-  }, [columnsVal, _, readonly, compactMode]);
+  }, [columnsVal, _, readonly, compactMode, api]);
 
   const basis = useMemo(() => {
     if (display === 'all') return `${width}px`;
