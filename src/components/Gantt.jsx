@@ -192,6 +192,20 @@ const Gantt = forwardRef(function Gantt(
     [dataStore, firstInRoute],
   );
 
+  // fire scale-change after any zoom-scale or set-scale action
+  useEffect(() => {
+    const emitScaleChange = () => {
+      const { zoom: z, scales: sc } = api.getState();
+      const level = z?.levels?.[z.level];
+      const unit = level?.scales?.[0]?.unit ?? sc?.[0]?.unit;
+      if (unit) {
+        api.exec('scale-change', { level: z?.level, unit });
+      }
+    };
+    api.on('zoom-scale', emitScaleChange);
+    api.on('set-scale', emitScaleChange);
+  }, [api]);
+
   // intercept set-scale to jump to a specific zoom level centered on a date
   useEffect(() => {
     api.intercept('set-scale', ({ unit, date }) => {

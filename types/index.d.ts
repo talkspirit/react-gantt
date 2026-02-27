@@ -31,6 +31,11 @@ export interface ISetScaleConfig {
   date?: Date;
 }
 
+export interface IScaleChangeConfig {
+  level: number;
+  unit: TLengthUnit;
+}
+
 export interface IColumnConfig extends Omit<IGanttColumn, 'header'> {
   cell?: ITableColumn['cell'];
   header?: ITableColumn['header'];
@@ -50,7 +55,12 @@ export declare const Gantt: ForwardRefExoticComponent<
     highlightTime?: (date: Date, unit: 'day' | 'hour') => string;
     init?: (api: IApi) => void;
   } & IConfig &
-    GanttActions<TMethodsConfig & { 'set-scale': ISetScaleConfig }> &
+    GanttActions<
+      TMethodsConfig & {
+        'set-scale': ISetScaleConfig;
+        'scale-change': IScaleChangeConfig;
+      }
+    > &
     RefAttributes<IApi>
 >;
 
