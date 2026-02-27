@@ -22,6 +22,7 @@ import type {
 } from '@svar-ui/gantt-store';
 
 export * from '@svar-ui/gantt-store';
+export { ICellProps } from '@svar-ui/react-grid';
 export { registerEditorItem } from '@svar-ui/react-editor';
 
 export interface IColumnConfig extends Omit<IGanttColumn, 'header'> {
