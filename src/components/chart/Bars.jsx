@@ -18,7 +18,12 @@ import BarSegments from './BarSegments.jsx';
 import './Bars.css';
 
 function Bars(props) {
-  const { readonly, taskTemplate: TaskTemplate } = props;
+  const {
+    readonly,
+    taskTemplate: TaskTemplate,
+    multiTaskRows = false,
+    rowMapping = null,
+  } = props;
 
   const api = useContext(storeContext);
 
@@ -40,11 +45,52 @@ function Bars(props) {
     if (!areaValue || !Array.isArray(rTasksValue)) return [];
     const start = areaValue.start ?? 0;
     const end = areaValue.end ?? 0;
+
+    // When multiTaskRows is enabled, include all tasks (store area doesn't
+    // account for reduced row count). Container height is already correct.
+    if (multiTaskRows && rowMapping) {
+      return rTasksValue.map((a) => ({ ...a }));
+    }
+
     return rTasksValue.slice(start, end).map((a) => ({ ...a }));
-  }, [rTasksCounter, areaValue]);
+  }, [rTasksCounter, areaValue, multiTaskRows, rowMapping]);
+
+  // Adjust task $y positions for multiTaskRows
+  const cellHeight = useStore(api, 'cellHeight');
+  const adjustedTasks = useMemo(() => {
+    if (!multiTaskRows || !rowMapping || !tasks.length) return tasks;
+
+    // Build rowId to rowIndex map
+    const rowIndexMap = new Map();
+    const seenRows = [];
+
+    rTasksValue.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!rowIndexMap.has(rowId)) {
+        rowIndexMap.set(rowId, seenRows.length);
+        seenRows.push(rowId);
+      }
+    });
+
+    // Adjust $y for visible tasks
+    return tasks.map((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      const rowIndex = rowIndexMap.get(rowId) ?? 0;
+      return {
+        ...task,
+        $y: rowIndex * cellHeight,
+        $y_base: task.$y_base !== undefined ? rowIndex * cellHeight : undefined,
+      };
+    });
+  }, [tasks, multiTaskRows, rowMapping, rTasksValue, cellHeight]);
 
   const lengthUnitWidth = useMemo(
     () => scalesValue.lengthUnitWidth,
+    [scalesValue],
+  );
+
+  const lengthUnit = useMemo(
+    () => scalesValue.lengthUnit || 'day',
     [scalesValue],
   );
 
@@ -247,14 +293,28 @@ function Bars(props) {
           let task = api.getTask(id);
           if (segment) task = task.segments[index];
 
+          // Calculate new dates directly instead of relying on store diff
+          const msPerDay = 24 * 60 * 60 * 1000;
+          const daysPerUnit =
+            lengthUnit === 'week' ? 7 :
+            lengthUnit === 'month' ? 30 :
+            lengthUnit === 'quarter' ? 91 :
+            lengthUnit === 'year' ? 365 : 1;
+          const diffMs = diff * daysPerUnit * msPerDay;
+
           if (mode === 'move') {
-            update.start = task.start;
+            update.start = new Date(task.start.getTime() + diffMs);
+            update.end = new Date(task.end.getTime() + diffMs);
+          } else if (mode === 'start') {
+            update.start = new Date(task.start.getTime() + diffMs);
             update.end = task.end;
-          } else update[mode] = task[mode];
+          } else if (mode === 'end') {
+            update.start = task.start;
+            update.end = new Date(task.end.getTime() + diffMs);
+          }
 
           api.exec('update-task', {
             id,
-            diff,
             task: update,
             ...(segment && { segmentIndex: index }),
           });
@@ -264,7 +324,7 @@ function Bars(props) {
 
       endDrag();
     }
-  }, [api, endDrag, taskMove, lengthUnitWidth]);
+  }, [api, endDrag, taskMove, lengthUnitWidth, lengthUnit]);
 
   const move = useCallback(
     (e, point) => {
@@ -587,7 +647,7 @@ function Bars(props) {
   return (
     <div
       className="wx-GKbcLEGA wx-bars"
-      style={{ lineHeight: `${tasks.length ? tasks[0].$h : 0}px` }}
+      style={{ lineHeight: `${adjustedTasks.length ? adjustedTasks[0].$h : 0}px` }}
       ref={containerRef}
       onContextMenu={contextmenu}
       onMouseDown={mousedown}
@@ -607,7 +667,7 @@ function Bars(props) {
         selectedLink={selectedLink}
         readonly={readonly}
       />
-      {tasks.map((task) => {
+      {adjustedTasks.map((task) => {
         if (task.$skip && task.$skip_baseline) return null;
         const barClass =
           `wx-bar wx-${taskTypeCss(task.type)}` +

@@ -78,6 +78,7 @@ const Gantt = forwardRef(function Gantt(
     zoom = false,
     baselines = false,
     highlightTime: highlightTimeProp = null,
+    onScaleClick = null,
     init = null,
     autoScale = true,
     unscheduledTasks = false,
@@ -88,6 +89,7 @@ const Gantt = forwardRef(function Gantt(
     calendar = null,
     undo = false,
     splitTasks = false,
+    multiTaskRows = false,
     summary = null,
     _export = false,
     ...restProps
@@ -148,6 +150,34 @@ const Gantt = forwardRef(function Gantt(
       parseTaskDates(tasks, { durationUnit, splitTasks, calendar });
     }
   }, [tasks, durationUnit, calendar, splitTasks, _export]);
+
+  // row mapping for multiTaskRows feature
+  const rowMapping = useMemo(() => {
+    if (!multiTaskRows) return null;
+
+    const rowMap = new Map(); // rowId -> taskIds[]
+    const taskRows = new Map(); // taskId -> rowId
+
+    const buildRowMap = (taskList) => {
+      taskList.forEach((task) => {
+        const rowId = task.row ?? task.id;
+        taskRows.set(task.id, rowId);
+
+        if (!rowMap.has(rowId)) {
+          rowMap.set(rowId, []);
+        }
+        rowMap.get(rowId).push(task.id);
+
+        if (task.data && task.data.length > 0) {
+          buildRowMap(task.data);
+        }
+      });
+    };
+
+    buildRowMap(tasks);
+
+    return { rowMap, taskRows };
+  }, [tasks, multiTaskRows]);
 
   const firstInRoute = useMemo(() => dataStore.in, [dataStore]);
 
@@ -373,7 +403,10 @@ const Gantt = forwardRef(function Gantt(
           readonly={readonly}
           cellBorders={cellBorders}
           highlightTime={highlightTime}
+          onScaleClick={onScaleClick}
           onTableAPIChange={setTableAPI}
+          multiTaskRows={multiTaskRows}
+          rowMapping={rowMapping}
         />
       </StoreContext.Provider>
     </context.i18n.Provider>

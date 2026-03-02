@@ -53,6 +53,8 @@ export declare const Gantt: ForwardRefExoticComponent<
     readonly?: boolean;
     cellBorders?: 'column' | 'full';
     highlightTime?: (date: Date, unit: 'day' | 'hour') => string;
+    onScaleClick?: (date: Date, unit: string, event?: MouseEvent) => void;
+    multiTaskRows?: boolean;
     init?: (api: IApi) => void;
   } & IConfig &
     GanttActions<

@@ -22,7 +22,10 @@ function Layout(props) {
     readonly,
     cellBorders,
     highlightTime,
+    onScaleClick,
     onTableAPIChange,
+    multiTaskRows = false,
+    rowMapping = null,
   } = props;
 
   const api = useContext(storeContext);
@@ -33,6 +36,27 @@ function Layout(props) {
   const rColumns = useStore(api, 'columns');
   const rScrollTask = useStore(api, '_scrollTask');
   const undo = useStore(api, 'undo');
+
+  // Compute rowMapping using reactive store tasks (updates when tasks are added/removed)
+  const computedRowMapping = useMemo(() => {
+    if (!multiTaskRows) return rowMapping;
+
+    const rowMap = new Map();
+    const taskRows = new Map();
+
+    rTasks.forEach((task) => {
+      const rowId = task.row ?? task.id;
+      taskRows.set(task.id, rowId);
+
+      if (!rowMap.has(rowId)) {
+        rowMap.set(rowId, []);
+      }
+      rowMap.get(rowId).push(task.id);
+    });
+
+    return { rowMap, taskRows };
+  }, [rTasks, multiTaskRows, rowMapping]);
+
   const [compactMode, setCompactMode] = useState(false);
   let [gridWidth, setGridWidth] = useState(0);
   const [ganttWidth, setGanttWidth] = useState(0);
@@ -91,10 +115,18 @@ function Layout(props) {
     [ganttWidth, innerWidth],
   );
   const fullWidth = useMemo(() => rScales.width, [rScales]);
-  const fullHeight = useMemo(
-    () => rTasks.length * rCellHeight,
-    [rTasks, rCellHeight],
-  );
+  const fullHeight = useMemo(() => {
+    if (!multiTaskRows || !computedRowMapping) {
+      return rTasks.length * rCellHeight;
+    }
+    // Count unique rows
+    const uniqueRows = new Set();
+    rTasks.forEach((task) => {
+      const rowId = computedRowMapping.taskRows.get(task.id) ?? task.id;
+      uniqueRows.add(rowId);
+    });
+    return uniqueRows.size * rCellHeight;
+  }, [rTasks, rCellHeight, multiTaskRows, computedRowMapping]);
   const scrollHeight = useMemo(
     () => rScales.height + fullHeight + scrollSize,
     [rScales, fullHeight, scrollSize],
@@ -271,6 +303,8 @@ function Layout(props) {
                   readonly={readonly}
                   fullHeight={fullHeight}
                   onTableAPIChange={onTableAPIChange}
+                  multiTaskRows={multiTaskRows}
+                  rowMapping={computedRowMapping}
                 />
                 <Resizer
                   value={gridWidth}
@@ -291,6 +325,9 @@ function Layout(props) {
                 taskTemplate={taskTemplate}
                 cellBorders={cellBorders}
                 highlightTime={highlightTime}
+                onScaleClick={onScaleClick}
+                multiTaskRows={multiTaskRows}
+                rowMapping={computedRowMapping}
               />
             </div>
           </div>

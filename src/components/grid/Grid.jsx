@@ -25,6 +25,8 @@ export default function Grid(props) {
     display = 'all',
     columnWidth: columnWidthProp = 0,
     onTableAPIChange,
+    multiTaskRows = false,
+    rowMapping = null,
   } = props;
   const [columnWidth, setColumnWidthProp] = useWritableProp(columnWidthProp);
   const [tableAPI, setTableAPI] = useState();
@@ -50,8 +52,14 @@ export default function Grid(props) {
 
   const tasks = useMemo(() => {
     if (!rTasksVal || !areaVal) return [];
+
+    // When multiTaskRows is enabled, include all tasks
+    if (multiTaskRows && rowMapping) {
+      return rTasksVal;
+    }
+
     return rTasksVal.slice(areaVal.start, areaVal.end);
-  }, [rTasksVal, areaVal]);
+  }, [rTasksVal, areaVal, multiTaskRows, rowMapping]);
 
   const execAction = useCallback(
     (id, action) => {

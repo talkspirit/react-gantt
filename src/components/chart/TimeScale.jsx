@@ -4,7 +4,7 @@ import { useStore } from '@svar-ui/lib-react';
 import './TimeScale.css';
 
 function TimeScale(props) {
-  const { highlightTime } = props;
+  const { highlightTime, onScaleClick } = props;
 
   const api = useContext(storeContext);
   const scales = useStore(api, '_scales');
@@ -26,8 +26,9 @@ function TimeScale(props) {
             return (
               <div
                 className={'wx-ZkvhDKir ' + className}
-                style={{ width: `${cell.width}px` }}
+                style={{ width: `${cell.width}px`, cursor: onScaleClick ? 'pointer' : undefined }}
                 key={cellIdx}
+                onClick={onScaleClick ? (e) => onScaleClick(cell.date, cell.unit, e.nativeEvent) : undefined}
               >
                 {cell.value}
               </div>
