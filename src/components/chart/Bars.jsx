@@ -17,12 +17,69 @@ import Links from './Links.jsx';
 import BarSegments from './BarSegments.jsx';
 import './Bars.css';
 
+// Module-level clipboard (persists across renders, used by copy-paste feature)
+let clipboardTasks = [];
+let clipboardBaseDate = null;
+let clipboardParent = null;
+
+// Check if two horizontal bounds overlap (AABB collision)
+const boundsOverlap = (left1, right1, left2, right2) => {
+  return left1 < right2 && right1 > left2;
+};
+
+const pixelToDate = (px, scales) => {
+  if (!scales || !scales.start) return null;
+  const { start, lengthUnitWidth, lengthUnit } = scales;
+  const msPerDay = 86400000;
+  const daysPerUnit =
+    lengthUnit === 'week' ? 7 :
+    lengthUnit === 'month' ? 30 :
+    lengthUnit === 'quarter' ? 91 :
+    lengthUnit === 'year' ? 365 : 1;
+  const units = Math.floor(px / lengthUnitWidth);
+  const date = new Date(start.getTime() + units * daysPerUnit * msPerDay);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+};
+
+const getCellOffset = (date, baseDate, scales) => {
+  if (!scales || !date || !baseDate) return 0;
+  const { lengthUnit } = scales;
+  const msPerDay = 86400000;
+  const daysPerUnit =
+    lengthUnit === 'week' ? 7 :
+    lengthUnit === 'month' ? 30 :
+    lengthUnit === 'quarter' ? 91 :
+    lengthUnit === 'year' ? 365 : 1;
+  const msPerUnit = daysPerUnit * msPerDay;
+  return Math.round((date.getTime() - baseDate.getTime()) / msPerUnit);
+};
+
+const addCells = (date, cells, scales) => {
+  if (!scales || !date) return date;
+  const { lengthUnit } = scales;
+  const msPerDay = 86400000;
+  const daysPerUnit =
+    lengthUnit === 'week' ? 7 :
+    lengthUnit === 'month' ? 30 :
+    lengthUnit === 'quarter' ? 91 :
+    lengthUnit === 'year' ? 365 : 1;
+  const msPerUnit = daysPerUnit * msPerDay;
+  const result = new Date(date.getTime() + cells * msPerUnit);
+  result.setUTCHours(0, 0, 0, 0);
+  return result;
+};
+
 function Bars(props) {
   const {
     readonly,
     taskTemplate: TaskTemplate,
     multiTaskRows = false,
     rowMapping = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -94,6 +151,93 @@ function Bars(props) {
     [scalesValue],
   );
 
+  // ── Collision Detection ──────────────────────────────────────────
+  const overlappingTaskIds = useMemo(() => {
+    const overlapping = new Set();
+    if (allowTaskIntersection || !multiTaskRows || !rowMapping) {
+      return overlapping;
+    }
+
+    const tasksByRow = new Map();
+    rTasksValue.forEach((task) => {
+      if (task.type === 'summary' || task.type === 'milestone') return;
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!tasksByRow.has(rowId)) {
+        tasksByRow.set(rowId, []);
+      }
+      tasksByRow.get(rowId).push(task);
+    });
+
+    tasksByRow.forEach((rowTasks) => {
+      if (rowTasks.length < 2) return;
+      for (let i = 0; i < rowTasks.length; i++) {
+        for (let j = i + 1; j < rowTasks.length; j++) {
+          const task1 = rowTasks[i];
+          const task2 = rowTasks[j];
+          if (boundsOverlap(task1.$x, task1.$x + task1.$w, task2.$x, task2.$x + task2.$w)) {
+            overlapping.add(task1.id);
+            overlapping.add(task2.id);
+          }
+        }
+      }
+    });
+
+    return overlapping;
+  }, [allowTaskIntersection, multiTaskRows, rowMapping, rTasksValue, rTasksCounter]);
+
+  // ── Summary Bar Counts ──────────────────────────────────────────
+  const summaryColCounts = useMemo(() => {
+    if (!summaryBarCounts || !rTasksValue?.length || !lengthUnitWidth) return null;
+
+    const childrenMap = new Map();
+    const summaryIds = new Set();
+    rTasksValue.forEach((task) => {
+      if (task.type === 'summary') {
+        summaryIds.add(task.id);
+      }
+      if (task.parent && task.parent !== 0 && task.type !== 'summary') {
+        if (!childrenMap.has(task.parent)) {
+          childrenMap.set(task.parent, []);
+        }
+        childrenMap.get(task.parent).push(task);
+      }
+    });
+
+    const counts = new Map();
+    summaryIds.forEach((summaryId) => {
+      const children = childrenMap.get(summaryId);
+      if (!children?.length) return;
+
+      const colCounts = new Map();
+      children.forEach((child) => {
+        if (child.$x == null || child.$w == null) return;
+        const startCol = Math.floor(child.$x / lengthUnitWidth);
+        const endCol = Math.ceil((child.$x + child.$w) / lengthUnitWidth);
+        for (let col = startCol; col < endCol; col++) {
+          colCounts.set(col, (colCounts.get(col) || 0) + 1);
+        }
+      });
+
+      if (colCounts.size > 0) {
+        counts.set(summaryId, colCounts);
+      }
+    });
+
+    return counts;
+  }, [summaryBarCounts, rTasksValue, lengthUnitWidth]);
+
+  // ── Marquee Selection State ─────────────────────────────────────
+  const [marquee, setMarquee] = useState(null);
+  const marqueeRef = useRef(null);
+  const [bulkMove, setBulkMove] = useState(null);
+
+  // ── Copy-Paste State ────────────────────────────────────────────
+  const [pastePreview, setPastePreview] = useState(null);
+  const [pasteTargetDate, setPasteTargetDate] = useState(null);
+  const pasteTargetDateRef = useRef(null);
+  pasteTargetDateRef.current = pasteTargetDate;
+  const lastMouseXRef = useRef(0);
+
   const ignoreNextClickRef = useRef(false);
 
   const [linkFrom, setLinkFrom] = useState(undefined);
@@ -163,6 +307,190 @@ function Bars(props) {
   const endDrag = useCallback(() => {
     document.body.style.userSelect = '';
   }, []);
+
+  // ── Marquee: compute adjusted Y positions for intersection test ──
+  const taskYPositions = useMemo(() => {
+    if (!multiTaskRows || !rowMapping || !rTasksValue?.length) return new Map();
+    const yMap = new Map();
+    const rowIndexMap = new Map();
+    const seenRows = [];
+    rTasksValue.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!rowIndexMap.has(rowId)) {
+        rowIndexMap.set(rowId, seenRows.length);
+        seenRows.push(rowId);
+      }
+    });
+    rTasksValue.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      const rowIndex = rowIndexMap.get(rowId) ?? 0;
+      yMap.set(task.id, rowIndex * cellHeight);
+    });
+    return yMap;
+  }, [rTasksValue, multiTaskRows, rowMapping, cellHeight]);
+
+  // Compute row Y positions map (for paste preview ghost placement)
+  const rowYPositions = useMemo(() => {
+    if (!multiTaskRows || !rowMapping || !rTasksValue?.length) return new Map();
+    const yMap = new Map();
+    const rowIndexMap = new Map();
+    const seenRows = [];
+    rTasksValue.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!rowIndexMap.has(rowId)) {
+        rowIndexMap.set(rowId, seenRows.length);
+        seenRows.push(rowId);
+      }
+    });
+    rTasksValue.forEach((task) => {
+      const row = task.row ?? task.id;
+      if (!yMap.has(row)) {
+        const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+        const rowIndex = rowIndexMap.get(rowId) ?? 0;
+        yMap.set(row, rowIndex * cellHeight);
+      }
+    });
+    return yMap;
+  }, [rTasksValue, multiTaskRows, rowMapping, cellHeight]);
+
+  // ── Marquee: getIntersectingTasks ──
+  const getIntersectingTasks = useCallback(
+    (rect) => {
+      if (!containerRef.current) return [];
+      const minX = Math.min(rect.startX, rect.currentX);
+      const maxX = Math.max(rect.startX, rect.currentX);
+      const minY = Math.min(rect.startY, rect.currentY);
+      const maxY = Math.max(rect.startY, rect.currentY);
+
+      return rTasksValue.filter((task) => {
+        const taskLeft = task.$x;
+        const taskRight = task.$x + task.$w;
+        const taskAbsoluteY = taskYPositions.get(task.id) ?? task.$y;
+        const taskTop = taskAbsoluteY;
+        const taskBottom = taskTop + task.$h;
+        return taskLeft < maxX && taskRight > minX && taskTop < maxY && taskBottom > minY;
+      });
+    },
+    [rTasksValue, taskYPositions],
+  );
+
+  // ── Copy-Paste: handleCopy ──
+  const handleCopy = useCallback(() => {
+    if (!copyPaste) return;
+    const selected = api.getState()._selected;
+    if (!selected || !selected.length) return;
+
+    const msPerDay = 86400000;
+    const copiedTasks = selected.map((sel) => {
+      const task = api.getTask(sel.id);
+      if (!task) return null;
+      const renderedTask = rTasksValue.find(t => t.id === sel.id);
+      if (!renderedTask) return null;
+      const { $x, $y, $h, $w, $skip, $level, ...clean } = renderedTask;
+      const durationDays = renderedTask.end && renderedTask.start
+        ? Math.round((renderedTask.end.getTime() - renderedTask.start.getTime()) / msPerDay)
+        : 0;
+      const startDayOfWeek = renderedTask.start
+        ? (renderedTask.start.getUTCDay() + 6) % 7
+        : 0;
+      return { ...clean, _durationDays: durationDays, _startDayOfWeek: startDayOfWeek, _originalWidth: $w, _originalHeight: $h };
+    }).filter(Boolean);
+
+    if (!copiedTasks.length) return;
+
+    const firstTask = copiedTasks[0];
+    const commonParent = firstTask.parent;
+    const validTasks = copiedTasks.filter(t => t.parent === commonParent);
+    if (validTasks.length === 0) return;
+
+    const baseDate = validTasks.reduce((min, t) => {
+      if (!t.start) return min;
+      return !min || t.start < min ? t.start : min;
+    }, null);
+
+    clipboardTasks = validTasks.map(t => ({
+      ...t,
+      _startCellOffset: getCellOffset(t.start, baseDate, scalesValue),
+    }));
+    clipboardParent = commonParent;
+    clipboardBaseDate = baseDate;
+  }, [copyPaste, api, rTasksValue, scalesValue]);
+
+  // ── Copy-Paste: runPaste ──
+  const runPaste = useCallback((targetDate, pastedTasks, parent) => {
+    if (!pastedTasks.length || !targetDate) return;
+    if (parent === undefined || parent === null) return;
+
+    const msPerDay = 86400000;
+    const history = api.getHistory();
+    history?.startBatch();
+
+    const targetColumnStart = new Date(targetDate);
+    targetColumnStart.setUTCHours(0, 0, 0, 0);
+
+    pastedTasks.forEach((task, i) => {
+      const newId = `task-${Date.now()}-${i}`;
+      const cellOffset = addCells(targetColumnStart, task._startCellOffset || 0, scalesValue);
+      const newStart = new Date(cellOffset.getTime() + (task._startDayOfWeek || 0) * msPerDay);
+      newStart.setUTCHours(0, 0, 0, 0);
+      const newEnd = new Date(newStart.getTime() + (task._durationDays || 7) * msPerDay);
+      newEnd.setUTCHours(0, 0, 0, 0);
+
+      api.exec('add-task', {
+        task: {
+          id: newId,
+          text: task.text,
+          start: newStart,
+          end: newEnd,
+          type: task.type || 'task',
+          parent: parent,
+          row: task.row,
+        },
+        target: parent,
+        mode: 'child',
+        skipUndo: i > 0,
+      });
+    });
+
+    history?.endBatch();
+  }, [api, scalesValue]);
+
+  // ── Copy-Paste: hotkey intercept (Ctrl+C / Ctrl+V) ──
+  useEffect(() => {
+    if (!copyPaste) return;
+
+    const unsub = api.intercept('hotkey', (ev) => {
+      if (ev.key === 'ctrl+c' || ev.key === 'meta+c') {
+        handleCopy();
+        return false;
+      }
+      if (ev.key === 'ctrl+v' || ev.key === 'meta+v') {
+        if (!clipboardTasks.length || !clipboardBaseDate) return false;
+        setPastePreview({
+          tasks: clipboardTasks,
+          baseDate: clipboardBaseDate,
+          parent: clipboardParent,
+          currentX: lastMouseXRef.current,
+        });
+        return false;
+      }
+    });
+    return unsub;
+  }, [copyPaste, api, handleCopy]);
+
+  // Escape key to cancel paste preview
+  useEffect(() => {
+    if (!pastePreview) return;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setPastePreview(null);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown, true);
+    return () => document.removeEventListener('keydown', handleKeyDown, true);
+  }, [pastePreview]);
 
   const getMoveMode = useCallback(
     (node, e, task) => {
@@ -235,12 +563,64 @@ function Bars(props) {
     (e) => {
       if (e.button !== 0) return;
 
+      // Skip mousedown processing when in paste preview mode
+      if (pastePreview) return;
+
       const node = locate(e);
+
+      // Marquee selection: click on empty space
+      if (!node && marqueeSelect && !readonly) {
+        const container = containerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+
+        const startX = e.clientX - rect.left;
+        const startY = e.clientY - rect.top;
+
+        if (copyPaste) {
+          const clickDate = pixelToDate(startX, scalesValue);
+          if (clickDate) {
+            pasteTargetDateRef.current = clickDate;
+            setPasteTargetDate(clickDate);
+          }
+        }
+
+        const marqueeData = {
+          startX,
+          startY,
+          currentX: startX,
+          currentY: startY,
+          ctrlKey: e.ctrlKey || e.metaKey,
+        };
+        setMarquee(marqueeData);
+        marqueeRef.current = marqueeData;
+        startDrag();
+        return;
+      }
+
+      // Bulk move: drag one of the selected tasks to move all of them
+      if (node && marqueeSelect && !readonly && selectedValue.length > 1) {
+        const id = getID(node);
+        const isSelected = selectedValue.some(s => s.id === id);
+        if (isSelected) {
+          setBulkMove({
+            startX: e.clientX,
+            ids: selectedValue.map(s => s.id),
+            tasks: selectedValue.map(s => {
+              const t = api.getTask(s.id);
+              return { id: s.id, start: t.start, end: t.end, $x: t.$x, $w: t.$w };
+            }),
+          });
+          startDrag();
+          return;
+        }
+      }
+
       if (!node) return;
 
       down(node, e);
     },
-    [down],
+    [down, marqueeSelect, copyPaste, readonly, pastePreview, scalesValue, selectedValue, api, startDrag],
   );
 
   const touchstart = useCallback(
@@ -261,6 +641,46 @@ function Bars(props) {
   }, []);
 
   const up = useCallback(() => {
+    // Handle marquee selection finalization
+    const currentMarquee = marqueeRef.current;
+    if (currentMarquee) {
+      const intersecting = getIntersectingTasks(currentMarquee);
+
+      if (currentMarquee.ctrlKey) {
+        intersecting.forEach((task) => {
+          api.exec('select-task', { id: task.id, toggle: true, marquee: true });
+        });
+      } else {
+        if (selectedValue.length > 0) {
+          api.exec('select-task', { id: null, marquee: true });
+        }
+        intersecting.forEach((task, index) => {
+          api.exec('select-task', {
+            id: task.id,
+            toggle: index > 0,
+            marquee: true,
+          });
+        });
+      }
+
+      setMarquee(null);
+      marqueeRef.current = null;
+      endDrag();
+      ignoreNextClickRef.current = true;
+      return;
+    }
+
+    // Handle bulk move finalization
+    if (bulkMove) {
+      const { ids, tasks: origTasks, startX } = bulkMove;
+      setBulkMove(null);
+      endDrag();
+      // If there was actual movement, we would update tasks here
+      // For now just end the drag
+      ignoreNextClickRef.current = true;
+      return;
+    }
+
     if (progressFromRef.current) {
       const { dx, id, marker, value } = progressFromRef.current;
       progressFromRef.current = null;
@@ -329,6 +749,39 @@ function Bars(props) {
   const move = useCallback(
     (e, point) => {
       const { clientX } = point;
+
+      // Track mouse position for copy-paste feature
+      if (copyPaste && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        lastMouseXRef.current = clientX - rect.left;
+      }
+
+      // Update paste preview position
+      if (pastePreview && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        setPastePreview(prev => prev ? { ...prev, currentX: clientX - rect.left } : null);
+      }
+
+      // Handle marquee selection drag
+      if (marquee) {
+        const container = containerRef.current;
+        if (!container) return;
+        const rect = container.getBoundingClientRect();
+
+        const currentX = clientX - rect.left;
+        const currentY = point.clientY - rect.top;
+
+        setMarquee((prev) => ({
+          ...prev,
+          currentX,
+          currentY,
+        }));
+        if (marqueeRef.current) {
+          marqueeRef.current.currentX = currentX;
+          marqueeRef.current.currentY = currentY;
+        }
+        return;
+      }
 
       if (!readonly) {
         if (progressFromRef.current) {
@@ -515,6 +968,16 @@ function Bars(props) {
         return;
       }
 
+      // Handle paste preview confirm on click
+      if (pastePreview && pastePreview.currentX != null) {
+        const targetDate = pixelToDate(pastePreview.currentX, scalesValue);
+        if (targetDate) {
+          runPaste(targetDate, pastePreview.tasks, pastePreview.parent);
+        }
+        setPastePreview(null);
+        return;
+      }
+
       if (e.target.closest('[data-interactive]')) return;
 
       const id = locateID(e.target);
@@ -669,13 +1132,15 @@ function Bars(props) {
       />
       {adjustedTasks.map((task) => {
         if (task.$skip && task.$skip_baseline) return null;
+        const isOverlapping = overlappingTaskIds.has(task.id);
         const barClass =
           `wx-bar wx-${taskTypeCss(task.type)}` +
           (touched && taskMove && task.id === taskMove.id ? ' wx-touch' : '') +
           (linkFrom && linkFrom.id === task.id ? ' wx-selected' : '') +
           (isTaskCritical(task.id) ? ' wx-critical' : '') +
           (task.$reorder ? ' wx-reorder-task' : '') +
-          (splitTasks && task.segments ? ' wx-split' : '');
+          (splitTasks && task.segments ? ' wx-split' : '') +
+          (isOverlapping ? ' wx-collision' : '');
         const leftLinkClass =
           'wx-link wx-left' +
           (linkFrom ? ' wx-visible' : '') +
@@ -782,6 +1247,44 @@ function Bars(props) {
                     </div>
                   )
                 ) : null}
+
+                {isOverlapping && (
+                  <div className="wx-GKbcLEGA wx-collision-warning" title="This task overlaps with another task in the same row">
+                    !
+                  </div>
+                )}
+
+                {summaryColCounts && task.type === 'summary' && (() => {
+                  const colCounts = summaryColCounts.get(task.id);
+                  const startCol = Math.floor(task.$x / lengthUnitWidth);
+                  const endCol = Math.ceil((task.$x + task.$w) / lengthUnitWidth);
+                  return (
+                    <div className="wx-GKbcLEGA wx-summary-week-counts">
+                      {Array.from({ length: endCol - startCol }, (_, i) => {
+                        const col = startCol + i;
+                        const count = colCounts?.get(col) || 0;
+                        return (
+                          <span
+                            key={col}
+                            className={`wx-GKbcLEGA wx-week-count${count === 0 ? ' wx-week-count-zero' : ''}`}
+                            style={{
+                              position: 'absolute',
+                              left: `${col * lengthUnitWidth - task.$x}px`,
+                              width: `${lengthUnitWidth}px`,
+                              top: 0,
+                              height: '100%',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            {count}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             )}
             {baselinesValue && !task.$skip_baseline ? (
@@ -796,6 +1299,40 @@ function Bars(props) {
           </Fragment>
         );
       })}
+
+      {/* Marquee selection rectangle */}
+      {marquee && (() => {
+        const left = Math.min(marquee.startX, marquee.currentX);
+        const top = Math.min(marquee.startY, marquee.currentY);
+        const width = Math.abs(marquee.currentX - marquee.startX);
+        const height = Math.abs(marquee.currentY - marquee.startY);
+        return (
+          <div
+            className="wx-GKbcLEGA wx-marquee-selection"
+            style={{ left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` }}
+          />
+        );
+      })()}
+
+      {/* Paste preview ghost tasks */}
+      {pastePreview && pastePreview.currentX != null && (
+        pastePreview.tasks.map((task, i) => {
+          const cellIndex = Math.floor(pastePreview.currentX / lengthUnitWidth);
+          const x = (cellIndex + (task._startCellOffset || 0)) * lengthUnitWidth;
+          const w = task._originalWidth || lengthUnitWidth;
+          const h = task._originalHeight || cellHeight;
+          const rowY = rowYPositions.get(task.row) ?? (task.$y || 0);
+          return (
+            <div
+              key={`preview-${i}`}
+              className="wx-GKbcLEGA wx-bar wx-task wx-paste-preview"
+              style={{ left: x, top: rowY, width: w, height: h }}
+            >
+              <div className="wx-GKbcLEGA wx-content">{task.$barText || task.text}</div>
+            </div>
+          );
+        })
+      )}
     </div>
   );
 }

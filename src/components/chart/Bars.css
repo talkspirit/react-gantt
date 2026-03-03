@@ -304,3 +304,71 @@
 .wx-critical.wx-split.wx-GKbcLEGA .wx-link.wx-selected .wx-inner {
   border-color: var(--wx-gantt-task-critical-color);
 }
+
+/* ── Summary bar week counts ────────────────────────────────────── */
+.wx-summary-week-counts.wx-GKbcLEGA {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  z-index: 3;
+}
+.wx-week-count.wx-GKbcLEGA {
+  font-size: 14px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  user-select: none;
+}
+.wx-week-count-zero.wx-GKbcLEGA {
+  opacity: 0.5;
+}
+
+/* ── Marquee selection rectangle ────────────────────────────────── */
+.wx-marquee-selection.wx-GKbcLEGA {
+  position: absolute;
+  border: 2px dashed var(--wx-color-primary, #2196f3);
+  background-color: rgba(33, 150, 243, 0.1);
+  pointer-events: none;
+  z-index: 10;
+  box-sizing: border-box;
+}
+
+/* ── Paste preview ghost tasks ──────────────────────────────────── */
+.wx-paste-preview.wx-bar.wx-GKbcLEGA {
+  opacity: 0.5;
+  pointer-events: none;
+  z-index: 5;
+  border: 2px dashed var(--wx-color-primary, #2196f3);
+}
+
+/* ── Task collision/overlap warning ─────────────────────────────── */
+.wx-bar.wx-collision.wx-GKbcLEGA {
+  border: 2px solid #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+}
+.wx-bar.wx-collision.wx-selected.wx-GKbcLEGA {
+  outline-color: #ef4444;
+}
+.wx-collision-warning.wx-GKbcLEGA {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  cursor: help;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1;
+}

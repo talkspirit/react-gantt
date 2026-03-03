@@ -90,6 +90,10 @@ const Gantt = forwardRef(function Gantt(
     undo = false,
     splitTasks = false,
     multiTaskRows = false,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
     summary = null,
     _export = false,
     ...restProps
@@ -407,6 +411,10 @@ const Gantt = forwardRef(function Gantt(
           onTableAPIChange={setTableAPI}
           multiTaskRows={multiTaskRows}
           rowMapping={rowMapping}
+          allowTaskIntersection={allowTaskIntersection}
+          summaryBarCounts={summaryBarCounts}
+          marqueeSelect={marqueeSelect}
+          copyPaste={copyPaste}
         />
       </StoreContext.Provider>
     </context.i18n.Provider>

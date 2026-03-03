@@ -55,6 +55,10 @@ export declare const Gantt: ForwardRefExoticComponent<
     highlightTime?: (date: Date, unit: 'day' | 'hour') => string;
     onScaleClick?: (date: Date, unit: string, event?: MouseEvent) => void;
     multiTaskRows?: boolean;
+    allowTaskIntersection?: boolean;
+    summaryBarCounts?: boolean;
+    marqueeSelect?: boolean;
+    copyPaste?: boolean;
     init?: (api: IApi) => void;
   } & IConfig &
     GanttActions<

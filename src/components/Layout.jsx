@@ -26,6 +26,10 @@ function Layout(props) {
     onTableAPIChange,
     multiTaskRows = false,
     rowMapping = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -328,6 +332,10 @@ function Layout(props) {
                 onScaleClick={onScaleClick}
                 multiTaskRows={multiTaskRows}
                 rowMapping={computedRowMapping}
+                allowTaskIntersection={allowTaskIntersection}
+                summaryBarCounts={summaryBarCounts}
+                marqueeSelect={marqueeSelect}
+                copyPaste={copyPaste}
               />
             </div>
           </div>

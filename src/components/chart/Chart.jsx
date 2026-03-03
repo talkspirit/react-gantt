@@ -26,6 +26,10 @@ function Chart(props) {
     onScaleClick,
     multiTaskRows = false,
     rowMapping = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -307,6 +311,10 @@ function Chart(props) {
           taskTemplate={taskTemplate}
           multiTaskRows={multiTaskRows}
           rowMapping={rowMapping}
+          allowTaskIntersection={allowTaskIntersection}
+          summaryBarCounts={summaryBarCounts}
+          marqueeSelect={marqueeSelect}
+          copyPaste={copyPaste}
         />
       </div>
     </div>

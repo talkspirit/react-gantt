@@ -1,6 +1,6 @@
 {
   "name": "@talkspirit/react-gantt",
-  "version": "2.6.0",
+  "version": "2.7.0",
   "description": "A customizable, high-performance React Gantt chart component for building project timelines.",
   "productTag": "gantt",
   "productTrial": true,
