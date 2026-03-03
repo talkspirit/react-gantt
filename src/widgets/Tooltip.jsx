@@ -56,6 +56,7 @@ function Tooltip(props) {
   }, [pos, areaCoords, Content, isTouch]);
 
   const timerRef = useRef(null);
+  const activeIdRef = useRef(null);
   const TIMEOUT = 300;
   const debounce = (code) => {
     clearTimeout(timerRef.current);
@@ -66,18 +67,38 @@ function Tooltip(props) {
 
   function move(e) {
     let { id, tooltip, target, at } = findAttribute(e.target);
+
+    // Left the bar area entirely — hide immediately
+    if (!id && !tooltip) {
+      clearTimeout(timerRef.current);
+      activeIdRef.current = null;
+      setPos(null);
+      setTooltipData(null);
+      setIsTouch(false);
+      return;
+    }
+
+    if (!tooltip) {
+      tooltip = getTaskText(id);
+    }
+
+    // Still hovering the same bar — keep tooltip visible, just update cursor X
+    if (activeIdRef.current === id && pos) {
+      const areaEl = areaRef.current;
+      const areaRect = areaEl
+        ? areaEl.getBoundingClientRect()
+        : { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
+      if (at !== 'left') {
+        setPos((prev) => (prev ? { ...prev, left: e.clientX - areaRect.left } : prev));
+      }
+      return;
+    }
+
+    // Switched to a different bar — reset and debounce
+    activeIdRef.current = id;
     setPos(null);
     setTooltipData(null);
     setIsTouch(false);
-
-    if (!tooltip) {
-      if (!id) {
-        clearTimeout(timerRef.current);
-        return;
-      } else {
-        tooltip = getTaskText(id);
-      }
-    }
 
     const clientX = e.clientX;
 
