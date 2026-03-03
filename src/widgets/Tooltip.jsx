@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import './Tooltip.css';
 
 function Tooltip(props) {
-  const { api, content: Content, children } = props;
+  const { api, content: Content, filter, children } = props;
 
   const areaRef = useRef(null);
   const tooltipNodeRef = useRef(null);
@@ -136,8 +136,16 @@ function Tooltip(props) {
 
     showTimerRef.current = setTimeout(() => {
       showTimerRef.current = null;
-      if (id) {
-        setTooltipData(getTaskObj(prepareId(id)));
+      const taskData = id ? getTaskObj(prepareId(id)) : null;
+
+      // If a filter is provided and rejects this task, skip the tooltip
+      if (filter && taskData && !filter(taskData)) {
+        overBarIdRef.current = null;
+        return;
+      }
+
+      if (taskData) {
+        setTooltipData(taskData);
       }
 
       const targetCoords = target.getBoundingClientRect();
@@ -182,6 +190,7 @@ function Tooltip(props) {
     clearTimeout(showTimerRef.current);
     clearTimeout(hideTimerRef.current);
     const taskData = getTaskObj(prepareId(id));
+    if (filter && taskData && !filter(taskData)) return;
     const tooltip = taskData?.text || '';
 
     const targetCoords = target.getBoundingClientRect();
