@@ -821,7 +821,7 @@
   width: 100%;
 }
 .wx-gantt-tooltip {
-  pointer-events: none;
+  pointer-events: auto;
   position: absolute;
   z-index: 10;
   box-shadow: var(--wx-box-shadow);

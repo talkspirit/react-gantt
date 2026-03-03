@@ -12,6 +12,10 @@ function Tooltip(props) {
   const [pos, setPos] = useState({});
   const [isTouch, setIsTouch] = useState(false);
 
+  // Track whether the mouse is over the tooltip itself
+  const overTooltipRef = useRef(false);
+  const dismissTimerRef = useRef(null);
+
   function findAttribute(node) {
     while (node) {
       if (node.getAttribute) {
@@ -58,6 +62,8 @@ function Tooltip(props) {
   const timerRef = useRef(null);
   const activeIdRef = useRef(null);
   const TIMEOUT = 300;
+  const DISMISS_DELAY = 150;
+
   const debounce = (code) => {
     clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -65,18 +71,42 @@ function Tooltip(props) {
     }, TIMEOUT);
   };
 
+  function dismiss() {
+    clearTimeout(timerRef.current);
+    activeIdRef.current = null;
+    setPos(null);
+    setTooltipData(null);
+    setIsTouch(false);
+  }
+
+  // Delayed dismiss — gives the user time to move from bar → tooltip
+  function scheduleDismiss() {
+    clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = setTimeout(() => {
+      if (!overTooltipRef.current) {
+        dismiss();
+      }
+    }, DISMISS_DELAY);
+  }
+
+  function cancelDismiss() {
+    clearTimeout(dismissTimerRef.current);
+  }
+
   function move(e) {
     let { id, tooltip, target, at } = findAttribute(e.target);
 
-    // Left the bar area entirely — hide immediately
+    // Left the bar area — schedule dismiss (user may be moving to tooltip)
     if (!id && !tooltip) {
       clearTimeout(timerRef.current);
-      activeIdRef.current = null;
-      setPos(null);
-      setTooltipData(null);
-      setIsTouch(false);
+      if (!overTooltipRef.current) {
+        scheduleDismiss();
+      }
       return;
     }
+
+    // Hovering a bar — cancel any pending dismiss
+    cancelDismiss();
 
     if (!tooltip) {
       tooltip = getTaskText(id);
@@ -127,6 +157,17 @@ function Tooltip(props) {
     });
   }
 
+  // Tooltip mouse enter/leave — keep tooltip alive while hovering it
+  function onTooltipMouseEnter() {
+    overTooltipRef.current = true;
+    cancelDismiss();
+  }
+
+  function onTooltipMouseLeave() {
+    overTooltipRef.current = false;
+    scheduleDismiss();
+  }
+
   function touchStart(e) {
     const touch = e.touches[0];
     if (!touch) return;
@@ -174,6 +215,14 @@ function Tooltip(props) {
     return Number.isFinite(numId) ? numId : id;
   }
 
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      clearTimeout(timerRef.current);
+      clearTimeout(dismissTimerRef.current);
+    };
+  }, []);
+
   const tooltipClass = [
     'wx-KG0Lwsqo',
     'wx-gantt-tooltip',
@@ -196,6 +245,8 @@ function Tooltip(props) {
           className={tooltipClass}
           ref={tooltipNodeRef}
           style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
+          onMouseEnter={onTooltipMouseEnter}
+          onMouseLeave={onTooltipMouseLeave}
         >
           {Content ? (
             <Content data={tooltipData} />
