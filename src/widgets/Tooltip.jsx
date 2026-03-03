@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import './Tooltip.css';
 
 function Tooltip(props) {
@@ -9,12 +9,17 @@ function Tooltip(props) {
 
   const [areaCoords, setAreaCoords] = useState({});
   const [tooltipData, setTooltipData] = useState(null);
-  const [pos, setPos] = useState({});
+  const [pos, setPos] = useState(null);
   const [isTouch, setIsTouch] = useState(false);
 
-  // Track whether the mouse is over the tooltip itself
+  // Hover state: track bar and tooltip independently
+  const overBarIdRef = useRef(null);
   const overTooltipRef = useRef(false);
-  const dismissTimerRef = useRef(null);
+  const showTimerRef = useRef(null);
+  const hideTimerRef = useRef(null);
+
+  const SHOW_DELAY = 300;
+  const HIDE_DELAY = 400;
 
   function findAttribute(node) {
     while (node) {
@@ -30,9 +35,9 @@ function Tooltip(props) {
     return { id: null, tooltip: null, target: null, at: null };
   }
 
+  // Boundary clamping — keep tooltip within the area
   useEffect(() => {
     const tooltipNode = tooltipNodeRef.current;
-    // Skip boundary clamping for touch tooltips (they use CSS transform centering)
     if (isTouch) return;
     if (tooltipNode && pos && (pos.text || Content)) {
       const tooltipCoords = tooltipNode.getBoundingClientRect();
@@ -59,83 +64,78 @@ function Tooltip(props) {
     }
   }, [pos, areaCoords, Content, isTouch]);
 
-  const timerRef = useRef(null);
-  const activeIdRef = useRef(null);
-  const TIMEOUT = 300;
-  const DISMISS_DELAY = 300;
-
-  const debounce = (code) => {
-    clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => {
-      code();
-    }, TIMEOUT);
-  };
-
-  function dismiss() {
-    clearTimeout(timerRef.current);
-    clearTimeout(dismissTimerRef.current);
-    activeIdRef.current = null;
+  const dismiss = useCallback(() => {
+    clearTimeout(showTimerRef.current);
+    clearTimeout(hideTimerRef.current);
+    showTimerRef.current = null;
+    hideTimerRef.current = null;
+    overBarIdRef.current = null;
     overTooltipRef.current = false;
     setPos(null);
     setTooltipData(null);
     setIsTouch(false);
-  }
+  }, []);
 
-  // Delayed dismiss — gives the user time to move from bar → tooltip.
-  // Only schedules if no timer is already pending (don't restart on each mousemove).
-  function scheduleDismiss() {
-    if (dismissTimerRef.current) return;
-    dismissTimerRef.current = setTimeout(() => {
-      dismissTimerRef.current = null;
-      if (!overTooltipRef.current) {
+  // Core logic: schedule hide only if NEITHER bar NOR tooltip is hovered
+  const scheduleHide = useCallback(() => {
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      hideTimerRef.current = null;
+      // Re-check: user may have moved back to bar or tooltip
+      if (!overBarIdRef.current && !overTooltipRef.current) {
         dismiss();
       }
-    }, DISMISS_DELAY);
-  }
+    }, HIDE_DELAY);
+  }, [dismiss]);
 
-  function cancelDismiss() {
-    clearTimeout(dismissTimerRef.current);
-    dismissTimerRef.current = null;
-  }
+  const cancelHide = useCallback(() => {
+    clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = null;
+  }, []);
 
   function move(e) {
-    // Ignore mousemove events bubbling up from the tooltip itself
+    // Ignore events from inside the tooltip
     if (tooltipNodeRef.current && tooltipNodeRef.current.contains(e.target)) {
       return;
     }
 
     let { id, tooltip, target, at } = findAttribute(e.target);
 
-    // Left the bar area — schedule dismiss (user may be moving to tooltip)
+    // No bar under cursor
     if (!id && !tooltip) {
-      clearTimeout(timerRef.current);
-      if (!overTooltipRef.current) {
-        scheduleDismiss();
+      clearTimeout(showTimerRef.current);
+      showTimerRef.current = null;
+      overBarIdRef.current = null;
+      // Don't hide immediately — user may be crossing to tooltip
+      if (!overTooltipRef.current && !hideTimerRef.current) {
+        scheduleHide();
       }
       return;
     }
 
-    // Hovering a bar — cancel any pending dismiss
-    cancelDismiss();
+    // Over a bar — cancel any pending hide
+    cancelHide();
 
     if (!tooltip) {
       tooltip = getTaskText(id);
     }
 
-    // Still hovering the same bar — keep tooltip in place
-    if (activeIdRef.current === id && pos) {
+    // Same bar — nothing to do
+    if (overBarIdRef.current === id) {
       return;
     }
 
-    // Switched to a different bar — reset and debounce
-    activeIdRef.current = id;
+    // New bar — dismiss old tooltip, show new one after delay
+    overBarIdRef.current = id;
+    clearTimeout(showTimerRef.current);
     setPos(null);
     setTooltipData(null);
     setIsTouch(false);
 
     const clientX = e.clientX;
 
-    debounce(() => {
+    showTimerRef.current = setTimeout(() => {
+      showTimerRef.current = null;
       if (id) {
         setTooltipData(getTaskObj(prepareId(id)));
       }
@@ -157,18 +157,20 @@ function Tooltip(props) {
 
       setAreaCoords(areaRect);
       setPos({ top, left, text: tooltip });
-    });
+    }, SHOW_DELAY);
   }
 
-  // Tooltip mouse enter/leave — keep tooltip alive while hovering it
   function onTooltipMouseEnter() {
     overTooltipRef.current = true;
-    cancelDismiss();
+    cancelHide();
   }
 
   function onTooltipMouseLeave() {
     overTooltipRef.current = false;
-    scheduleDismiss();
+    // Only schedule hide if also not on a bar
+    if (!overBarIdRef.current) {
+      scheduleHide();
+    }
   }
 
   function touchStart(e) {
@@ -177,8 +179,8 @@ function Tooltip(props) {
     const { id, target } = findAttribute(e.target);
     if (!id) return;
 
-    // Show immediately — no debounce for touch
-    clearTimeout(timerRef.current);
+    clearTimeout(showTimerRef.current);
+    clearTimeout(hideTimerRef.current);
     const taskData = getTaskObj(prepareId(id));
     const tooltip = taskData?.text || '';
 
@@ -191,7 +193,6 @@ function Tooltip(props) {
     setTooltipData(taskData);
     setAreaCoords(areaRect);
     setIsTouch(true);
-    // Position above the bar, centered on touch X
     setPos({
       top: targetCoords.top - areaRect.top - 8,
       left: touch.clientX - areaRect.left,
@@ -200,9 +201,7 @@ function Tooltip(props) {
   }
 
   function touchDismiss() {
-    setPos(null);
-    setTooltipData(null);
-    setIsTouch(false);
+    dismiss();
   }
 
   function getTaskObj(id) {
@@ -221,8 +220,8 @@ function Tooltip(props) {
   // Clean up timers on unmount
   useEffect(() => {
     return () => {
-      clearTimeout(timerRef.current);
-      clearTimeout(dismissTimerRef.current);
+      clearTimeout(showTimerRef.current);
+      clearTimeout(hideTimerRef.current);
     };
   }, []);
 
