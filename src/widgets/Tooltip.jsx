@@ -149,8 +149,8 @@ function Tooltip(props) {
   }
 
   function prepareId(id) {
-    const numId = parseInt(id);
-    return isNaN(numId) ? id : numId;
+    const numId = Number(id);
+    return Number.isFinite(numId) ? numId : id;
   }
 
   const tooltipClass = [
