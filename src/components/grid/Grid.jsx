@@ -24,9 +24,11 @@ export default function Grid(props) {
     width = 0,
     display = 'all',
     columnWidth: columnWidthProp = 0,
+    fullHeight,
     onTableAPIChange,
     multiTaskRows = false,
     rowMapping = null,
+    rowHeightOverrides = null,
   } = props;
   const [columnWidth, setColumnWidthProp] = useWritableProp(columnWidthProp);
   const [tableAPI, setTableAPI] = useState();
@@ -53,9 +55,15 @@ export default function Grid(props) {
   const tasks = useMemo(() => {
     if (!rTasksVal || !areaVal) return [];
 
-    // When multiTaskRows is enabled, include all tasks
+    // When multiTaskRows is enabled, de-duplicate: show one row per unique visual row
     if (multiTaskRows && rowMapping) {
-      return rTasksVal;
+      const seenRows = new Set();
+      return rTasksVal.filter((task) => {
+        const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+        if (seenRows.has(rowId)) return false;
+        seenRows.add(rowId);
+        return true;
+      });
     }
 
     return rTasksVal.slice(areaVal.start, areaVal.end);
@@ -334,11 +342,19 @@ export default function Grid(props) {
   const setScrollOffset = useCallback(() => {
     if (tableRef.current && allTasks !== null) {
       const body = tableRef.current.querySelector('.wx-body');
-      if (body)
-        body.style.top = -((scrollTopVal ?? 0) - (scrollDelta ?? 0)) + 'px';
+      if (body) {
+        // When multiTaskRows is enabled, all rows are rendered at once (no virtual
+        // scrolling). Skip SVAR's scroll offset — the outer scroll container
+        // handles positioning naturally. Without this, the offset clips the first rows.
+        if (multiTaskRows) {
+          body.style.top = '0px';
+        } else {
+          body.style.top = -((scrollTopVal ?? 0) - (scrollDelta ?? 0)) + 'px';
+        }
+      }
     }
     if (tableContainerRef.current) tableContainerRef.current.scrollTop = 0;
-  }, [allTasks, scrollTopVal, scrollDelta]);
+  }, [allTasks, scrollTopVal, scrollDelta, multiTaskRows]);
 
   useEffect(() => {
     if (tableRef.current) {
@@ -377,6 +393,35 @@ export default function Grid(props) {
       });
     }
   }, [scrollTask, tableAPI]);
+
+  // When multiTaskRows bypasses WxGrid's virtual scroll (all rows rendered
+  // at once), WxGrid auto-sizes rows to content height (~25px) instead of
+  // respecting sizes.rowHeight. Patch every row to cellHeight, then apply
+  // any rowHeightOverrides on top. Also patch the body container height
+  // since WxGrid computes it from `sizes.rowHeight` (uniform) rather than
+  // variable per-row heights.
+  useEffect(() => {
+    if (!multiTaskRows) return;
+    const tableEl = tableRef.current;
+    if (!tableEl) return;
+    const bodyEl = tableEl.querySelector('.wx-table-box .wx-body');
+    if (!bodyEl) return;
+
+    let totalHeight = 0;
+    const rows = bodyEl.querySelectorAll('[data-id]');
+    rows.forEach((rowEl) => {
+      const id = rowEl.getAttribute('data-id');
+      const h = (rowHeightOverrides && id && rowHeightOverrides[id]) || cellHeightVal;
+      rowEl.style.height = `${h}px`;
+      rowEl.style.minHeight = `${h}px`;
+      totalHeight += h;
+    });
+
+    // Override body container height to match sum of variable row heights
+    if (totalHeight > 0) {
+      bodyEl.style.height = `${totalHeight}px`;
+    }
+  }, [rowHeightOverrides, multiTaskRows, allTasks, cellHeightVal]);
 
   const startReorder = useCallback(
     ({ id }) => {

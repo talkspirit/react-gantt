@@ -26,6 +26,7 @@ function Layout(props) {
     onTableAPIChange,
     multiTaskRows = false,
     rowMapping = null,
+    rowHeightOverrides = null,
     allowTaskIntersection = true,
     summaryBarCounts = false,
     marqueeSelect = false,
@@ -119,18 +120,28 @@ function Layout(props) {
     [ganttWidth, innerWidth],
   );
   const fullWidth = useMemo(() => rScales.width, [rScales]);
+  // Extra bottom space so the chart's horizontal scrollbar doesn't overlap the last row.
+  const SCROLLBAR_PADDING = 14;
   const fullHeight = useMemo(() => {
+    let height;
     if (!multiTaskRows || !computedRowMapping) {
-      return rTasks.length * rCellHeight;
+      height = rTasks.length * rCellHeight;
+    } else {
+      // Collect unique rows in order and sum their heights
+      const seenRows = [];
+      rTasks.forEach((task) => {
+        const rowId = computedRowMapping.taskRows.get(task.id) ?? task.id;
+        if (!seenRows.includes(rowId)) {
+          seenRows.push(rowId);
+        }
+      });
+      height = 0;
+      for (const rowId of seenRows) {
+        height += (rowHeightOverrides && rowHeightOverrides[rowId]) || rCellHeight;
+      }
     }
-    // Count unique rows
-    const uniqueRows = new Set();
-    rTasks.forEach((task) => {
-      const rowId = computedRowMapping.taskRows.get(task.id) ?? task.id;
-      uniqueRows.add(rowId);
-    });
-    return uniqueRows.size * rCellHeight;
-  }, [rTasks, rCellHeight, multiTaskRows, computedRowMapping]);
+    return height + SCROLLBAR_PADDING;
+  }, [rTasks, rCellHeight, multiTaskRows, computedRowMapping, rowHeightOverrides]);
   const scrollHeight = useMemo(
     () => rScales.height + fullHeight + scrollSize,
     [rScales, fullHeight, scrollSize],
@@ -141,8 +152,31 @@ function Layout(props) {
   );
 
   const chartRef = useRef(null);
+
+  // Suppress expand-scale for a short window after any zoom action so it
+  // doesn't fight the zoom direction (zoom-out shrinks content width →
+  // expand-scale would immediately widen it back).
+  const zoomLockRef = useRef(false);
+  const zoomLockTimer = useRef(null);
+
+  useEffect(() => {
+    const lock = () => {
+      zoomLockRef.current = true;
+      clearTimeout(zoomLockTimer.current);
+      zoomLockTimer.current = setTimeout(() => {
+        zoomLockRef.current = false;
+      }, 300);
+    };
+    api.on('zoom-scale', lock);
+    api.on('set-scale', lock);
+    return () => {
+      clearTimeout(zoomLockTimer.current);
+    };
+  }, [api]);
+
   const expandScale = useCallback(() => {
     Promise.resolve().then(() => {
+      if (zoomLockRef.current) return;
       if ((ganttWidth ?? 0) > (totalWidth ?? 0)) {
         const minWidth = (ganttWidth ?? 0) - gridWidth;
         api.exec('expand-scale', { minWidth });
@@ -150,20 +184,22 @@ function Layout(props) {
     });
   }, [ganttWidth, totalWidth, gridWidth, api]);
 
+  // Use a ref so the ResizeObserver always calls the latest expandScale
+  // without recreating the observer (which fires immediately on creation
+  // per spec, causing expand-scale to fight zoom-scale).
+  const expandScaleRef = useRef(expandScale);
+  expandScaleRef.current = expandScale;
+
   useEffect(() => {
     let ro;
     if (chartRef.current) {
-      ro = new ResizeObserver(expandScale);
+      ro = new ResizeObserver(() => expandScaleRef.current());
       ro.observe(chartRef.current);
     }
     return () => {
       if (ro) ro.disconnect();
     };
-  }, [chartRef.current, expandScale]);
-
-  useEffect(() => {
-    expandScale();
-  }, [fullWidth]);
+  }, [chartRef.current]);
 
   const ganttDivRef = useRef(null);
   const pseudoRowsRef = useRef(null);
@@ -309,6 +345,7 @@ function Layout(props) {
                   onTableAPIChange={onTableAPIChange}
                   multiTaskRows={multiTaskRows}
                   rowMapping={computedRowMapping}
+                  rowHeightOverrides={rowHeightOverrides}
                 />
                 <Resizer
                   value={gridWidth}
@@ -332,6 +369,7 @@ function Layout(props) {
                 onScaleClick={onScaleClick}
                 multiTaskRows={multiTaskRows}
                 rowMapping={computedRowMapping}
+                rowHeightOverrides={rowHeightOverrides}
                 allowTaskIntersection={allowTaskIntersection}
                 summaryBarCounts={summaryBarCounts}
                 marqueeSelect={marqueeSelect}

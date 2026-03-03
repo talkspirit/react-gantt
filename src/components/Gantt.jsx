@@ -55,15 +55,24 @@ const defaultScales = [
   { unit: 'day', step: 1, format: '%j' },
 ];
 
+// Stable default values — module-level constants avoid creating new references
+// on every render, which would defeat React memoization and cause the init
+// useEffect to re-fire unnecessarily (resetting zoom/scale state).
+const defaultMarkers = [];
+const defaultTasks = [];
+const defaultSelected = [];
+const defaultLinks = [];
+const defaultSchedule = { type: 'forward' };
+
 const Gantt = forwardRef(function Gantt(
   {
     taskTemplate = null,
-    markers = [],
+    markers = defaultMarkers,
     taskTypes = defaultTaskTypes,
-    tasks = [],
-    selected = [],
+    tasks = defaultTasks,
+    selected = defaultSelected,
     activeTask = null,
-    links = [],
+    links = defaultLinks,
     scales = defaultScales,
     columns = defaultColumns,
     start = null,
@@ -83,13 +92,14 @@ const Gantt = forwardRef(function Gantt(
     autoScale = true,
     unscheduledTasks = false,
     criticalPath = null,
-    schedule = { type: 'forward' },
+    schedule = defaultSchedule,
     projectStart = null,
     projectEnd = null,
     calendar = null,
     undo = false,
     splitTasks = false,
     multiTaskRows = false,
+    rowHeightOverrides = null,
     allowTaskIntersection = true,
     summaryBarCounts = false,
     marqueeSelect = false,
@@ -291,7 +301,6 @@ const Gantt = forwardRef(function Gantt(
     if (!initOnceRef.current) {
       if (init) init(api);
     } else {
-      // const prev = dataStore.getState();
       dataStore.init({
         tasks,
         links: normalizedConfig.links,
@@ -411,6 +420,7 @@ const Gantt = forwardRef(function Gantt(
           onTableAPIChange={setTableAPI}
           multiTaskRows={multiTaskRows}
           rowMapping={rowMapping}
+          rowHeightOverrides={rowHeightOverrides}
           allowTaskIntersection={allowTaskIntersection}
           summaryBarCounts={summaryBarCounts}
           marqueeSelect={marqueeSelect}

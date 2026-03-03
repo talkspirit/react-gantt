@@ -76,6 +76,7 @@ function Bars(props) {
     taskTemplate: TaskTemplate,
     multiTaskRows = false,
     rowMapping = null,
+    rowHeightOverrides = null,
     allowTaskIntersection = true,
     summaryBarCounts = false,
     marqueeSelect = false,
@@ -129,17 +130,108 @@ function Bars(props) {
       }
     });
 
-    // Adjust $y for visible tasks
+    // Group NON-SUMMARY tasks per row for lane-packing.
+    // Summary rows sharing a visual row with tasks are hidden ($skip),
+    // so they must not occupy a lane.
+    const rowTasks = new Map(); // rowId -> task[]
+    tasks.forEach((task) => {
+      if (task.type === 'summary') return;
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!rowTasks.has(rowId)) rowTasks.set(rowId, []);
+      rowTasks.get(rowId).push(task);
+    });
+
+    // Assign each task to the lowest lane where it doesn't overlap
+    // with existing tasks (interval packing using $x / $w pixel bounds).
+    const taskLane = new Map(); // taskId -> lane index
+    const rowLaneCounts = new Map(); // rowId -> number of lanes
+    rowTasks.forEach((tasksInRow, rowId) => {
+      // lanes[i] = array of tasks placed in lane i
+      const lanes = [];
+      // Sort by horizontal start so greedy first-fit works well
+      const sorted = [...tasksInRow].sort((a, b) => (a.$x ?? 0) - (b.$x ?? 0));
+      for (const t of sorted) {
+        const tLeft = t.$x ?? 0;
+        const tRight = tLeft + (t.$w ?? 0);
+        let placed = false;
+        for (let li = 0; li < lanes.length; li++) {
+          // Check if task overlaps any existing task in this lane
+          const conflict = lanes[li].some((existing) => {
+            const eLeft = existing.$x ?? 0;
+            const eRight = eLeft + (existing.$w ?? 0);
+            return boundsOverlap(tLeft, tRight, eLeft, eRight);
+          });
+          if (!conflict) {
+            lanes[li].push(t);
+            taskLane.set(t.id, li);
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          lanes.push([t]);
+          taskLane.set(t.id, lanes.length - 1);
+        }
+      }
+      rowLaneCounts.set(rowId, lanes.length);
+    });
+
+    // Compute cumulative Y offset using rowHeightOverrides
+    const rowYOffsets = new Map();
+    let cumulativeY = 0;
+    for (const rowId of seenRows) {
+      rowYOffsets.set(rowId, cumulativeY);
+      const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+      cumulativeY += rowH;
+    }
+
+    // Position tasks using lane assignments.
+    // For non-stacked rows, preserve vertical centering that SVAR normally applies
+    // (bar is centered within cellHeight via a small vertical padding).
     return tasks.map((task) => {
       const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
-      const rowIndex = rowIndexMap.get(rowId) ?? 0;
+      const baseY = rowYOffsets.get(rowId) ?? 0;
+
+      // Hide summary bars that share a row with child tasks —
+      // the individual task bars replace the summary visually.
+      if (task.type === 'summary') {
+        const childCount = (rowTasks.get(rowId) || []).length;
+        if (childCount > 0) {
+          return { ...task, $y: baseY, $skip: true };
+        }
+        // Vertically center within the row
+        const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+        const vPad = Math.max(0, Math.floor((rowH - task.$h) / 2));
+        return { ...task, $y: baseY + vPad, $y_base: task.$y_base !== undefined ? baseY + vPad : undefined };
+      }
+
+      const laneCount = rowLaneCounts.get(rowId) || 1;
+      const lane = taskLane.get(task.id) ?? 0;
+
+      if (laneCount > 1) {
+        // Keep original bar height — stack with spacing between lanes.
+        // Each lane slot = barHeight + gap, with outer margin top/bottom.
+        const gap = 4;
+        const outerMargin = 3;
+        const slotH = task.$h + gap;
+        const y = baseY + outerMargin + lane * slotH;
+        return {
+          ...task,
+          $y: y,
+          $y_base: task.$y_base !== undefined ? y : undefined,
+        };
+      }
+      // Single lane — center vertically like SVAR normally does.
+      // Use Math.round to match SVAR's native centering as closely as possible.
+      const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+      const vPad = Math.max(0, Math.round((rowH - task.$h) / 2));
       return {
         ...task,
-        $y: rowIndex * cellHeight,
-        $y_base: task.$y_base !== undefined ? rowIndex * cellHeight : undefined,
+        $y: baseY + vPad,
+        $y_base: task.$y_base !== undefined ? baseY + vPad : undefined,
       };
     });
-  }, [tasks, multiTaskRows, rowMapping, rTasksValue, cellHeight]);
+  }, [tasks, multiTaskRows, rowMapping, rTasksValue, cellHeight, rowHeightOverrides]);
 
   const lengthUnitWidth = useMemo(
     () => scalesValue.lengthUnitWidth,
@@ -1028,12 +1120,16 @@ function Bars(props) {
   );
 
   const taskStyle = useCallback((task) => {
-    return {
+    const style = {
       left: `${task.$x}px`,
       top: `${task.$y}px`,
       width: `${task.$w}px`,
       height: `${task.$h}px`,
     };
+    // Support per-task bar color — sets background on the wx-bar element
+    // so progress fill (between bar background and wx-content) stays visible.
+    if (task.color) style.backgroundColor = task.color;
+    return style;
   }, []);
 
   const baselineStyle = useCallback((task) => {

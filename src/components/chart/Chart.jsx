@@ -26,6 +26,7 @@ function Chart(props) {
     onScaleClick,
     multiTaskRows = false,
     rowMapping = null,
+    rowHeightOverrides = null,
     allowTaskIntersection = true,
     summaryBarCounts = false,
     marqueeSelect = false,
@@ -91,14 +92,35 @@ function Chart(props) {
     [chartHeight, fullHeight],
   );
 
+  // Compute rowLayout for CellGrid when variable row heights are active
+  const rowLayout = useMemo(() => {
+    if (!rowHeightOverrides || !multiTaskRows || !rowMapping || !rTasks?.length) return null;
+    // Check if any override actually differs from cellHeight
+    const hasOverride = Object.values(rowHeightOverrides).some((h) => h !== cellHeight);
+    if (!hasOverride) return null;
+
+    const seenRows = [];
+    rTasks.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!seenRows.includes(rowId)) seenRows.push(rowId);
+    });
+    return seenRows.map((rowId) => ({
+      id: rowId,
+      height: rowHeightOverrides[rowId] || cellHeight,
+    }));
+  }, [rTasks, rowMapping, rowHeightOverrides, multiTaskRows, cellHeight]);
+
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
 
     if (typeof rScrollTop === 'number') {
-      el.scrollTop = rScrollTop;
+      // When multiTaskRows is enabled, all bars are positioned absolutely using
+      // cumulative Y offsets. Skip SVAR's scroll offset to prevent bars from
+      // being pushed off screen by a stale scrollTop value.
+      el.scrollTop = multiTaskRows ? 0 : rScrollTop;
     }
-  }, [rScrollTop]);
+  }, [rScrollTop, multiTaskRows]);
 
   const onScroll = () => {
     const scroll = { left: true };
@@ -291,7 +313,7 @@ function Chart(props) {
           </div>
         ) : null}
 
-        <CellGrid borders={cellBorders} />
+        <CellGrid borders={cellBorders} rowLayout={rowLayout} />
 
         {selected && selected.length
           ? selected.map((obj, index) =>
@@ -311,6 +333,7 @@ function Chart(props) {
           taskTemplate={taskTemplate}
           multiTaskRows={multiTaskRows}
           rowMapping={rowMapping}
+          rowHeightOverrides={rowHeightOverrides}
           allowTaskIntersection={allowTaskIntersection}
           summaryBarCounts={summaryBarCounts}
           marqueeSelect={marqueeSelect}
