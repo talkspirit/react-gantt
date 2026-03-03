@@ -4097,7 +4097,7 @@ function Rs(t) {
             onMouseEnter: xe,
             onMouseLeave: le,
             children: r
-              ? /* @__PURE__ */ u(r, { data: g })
+              ? /* @__PURE__ */ u(r, { data: g, api: n })
               : s.text
                 ? /* @__PURE__ */ u('div', {
                     className: 'wx-KG0Lwsqo wx-gantt-tooltip-text',

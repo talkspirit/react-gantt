@@ -251,7 +251,7 @@ function Tooltip(props) {
           onMouseLeave={onTooltipMouseLeave}
         >
           {Content ? (
-            <Content data={tooltipData} />
+            <Content data={tooltipData} api={api} />
           ) : pos.text ? (
             <div className="wx-KG0Lwsqo wx-gantt-tooltip-text">{pos.text}</div>
           ) : null}

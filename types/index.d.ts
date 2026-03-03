@@ -98,6 +98,7 @@ export declare const Editor: FC<
 export declare const Tooltip: FC<{
   content?: FC<{
     data: ITask;
+    api?: IApi;
   }>;
   api?: IApi;
   children?: ReactNode;
