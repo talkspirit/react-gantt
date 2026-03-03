@@ -55,15 +55,24 @@ const defaultScales = [
   { unit: 'day', step: 1, format: '%j' },
 ];
 
+// Stable default values — module-level constants avoid creating new references
+// on every render, which would defeat React memoization and cause the init
+// useEffect to re-fire unnecessarily (resetting zoom/scale state).
+const defaultMarkers = [];
+const defaultTasks = [];
+const defaultSelected = [];
+const defaultLinks = [];
+const defaultSchedule = { type: 'forward' };
+
 const Gantt = forwardRef(function Gantt(
   {
     taskTemplate = null,
-    markers = [],
+    markers = defaultMarkers,
     taskTypes = defaultTaskTypes,
-    tasks = [],
-    selected = [],
+    tasks = defaultTasks,
+    selected = defaultSelected,
     activeTask = null,
-    links = [],
+    links = defaultLinks,
     scales = defaultScales,
     columns = defaultColumns,
     start = null,
@@ -78,16 +87,23 @@ const Gantt = forwardRef(function Gantt(
     zoom = false,
     baselines = false,
     highlightTime: highlightTimeProp = null,
+    onScaleClick = null,
     init = null,
     autoScale = true,
     unscheduledTasks = false,
     criticalPath = null,
-    schedule = { type: 'forward' },
+    schedule = defaultSchedule,
     projectStart = null,
     projectEnd = null,
     calendar = null,
     undo = false,
     splitTasks = false,
+    multiTaskRows = false,
+    rowHeightOverrides = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
     summary = null,
     _export = false,
     ...restProps
@@ -148,6 +164,34 @@ const Gantt = forwardRef(function Gantt(
       parseTaskDates(tasks, { durationUnit, splitTasks, calendar });
     }
   }, [tasks, durationUnit, calendar, splitTasks, _export]);
+
+  // row mapping for multiTaskRows feature
+  const rowMapping = useMemo(() => {
+    if (!multiTaskRows) return null;
+
+    const rowMap = new Map(); // rowId -> taskIds[]
+    const taskRows = new Map(); // taskId -> rowId
+
+    const buildRowMap = (taskList) => {
+      taskList.forEach((task) => {
+        const rowId = task.row ?? task.id;
+        taskRows.set(task.id, rowId);
+
+        if (!rowMap.has(rowId)) {
+          rowMap.set(rowId, []);
+        }
+        rowMap.get(rowId).push(task.id);
+
+        if (task.data && task.data.length > 0) {
+          buildRowMap(task.data);
+        }
+      });
+    };
+
+    buildRowMap(tasks);
+
+    return { rowMap, taskRows };
+  }, [tasks, multiTaskRows]);
 
   const firstInRoute = useMemo(() => dataStore.in, [dataStore]);
 
@@ -257,7 +301,6 @@ const Gantt = forwardRef(function Gantt(
     if (!initOnceRef.current) {
       if (init) init(api);
     } else {
-      // const prev = dataStore.getState();
       dataStore.init({
         tasks,
         links: normalizedConfig.links,
@@ -373,7 +416,15 @@ const Gantt = forwardRef(function Gantt(
           readonly={readonly}
           cellBorders={cellBorders}
           highlightTime={highlightTime}
+          onScaleClick={onScaleClick}
           onTableAPIChange={setTableAPI}
+          multiTaskRows={multiTaskRows}
+          rowMapping={rowMapping}
+          rowHeightOverrides={rowHeightOverrides}
+          allowTaskIntersection={allowTaskIntersection}
+          summaryBarCounts={summaryBarCounts}
+          marqueeSelect={marqueeSelect}
+          copyPaste={copyPaste}
         />
       </StoreContext.Provider>
     </context.i18n.Provider>

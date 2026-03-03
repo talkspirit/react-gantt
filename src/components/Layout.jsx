@@ -22,7 +22,15 @@ function Layout(props) {
     readonly,
     cellBorders,
     highlightTime,
+    onScaleClick,
     onTableAPIChange,
+    multiTaskRows = false,
+    rowMapping = null,
+    rowHeightOverrides = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -33,6 +41,27 @@ function Layout(props) {
   const rColumns = useStore(api, 'columns');
   const rScrollTask = useStore(api, '_scrollTask');
   const undo = useStore(api, 'undo');
+
+  // Compute rowMapping using reactive store tasks (updates when tasks are added/removed)
+  const computedRowMapping = useMemo(() => {
+    if (!multiTaskRows) return rowMapping;
+
+    const rowMap = new Map();
+    const taskRows = new Map();
+
+    rTasks.forEach((task) => {
+      const rowId = task.row ?? task.id;
+      taskRows.set(task.id, rowId);
+
+      if (!rowMap.has(rowId)) {
+        rowMap.set(rowId, []);
+      }
+      rowMap.get(rowId).push(task.id);
+    });
+
+    return { rowMap, taskRows };
+  }, [rTasks, multiTaskRows, rowMapping]);
+
   const [compactMode, setCompactMode] = useState(false);
   let [gridWidth, setGridWidth] = useState(0);
   const [ganttWidth, setGanttWidth] = useState(0);
@@ -91,10 +120,28 @@ function Layout(props) {
     [ganttWidth, innerWidth],
   );
   const fullWidth = useMemo(() => rScales.width, [rScales]);
-  const fullHeight = useMemo(
-    () => rTasks.length * rCellHeight,
-    [rTasks, rCellHeight],
-  );
+  // Extra bottom space so the chart's horizontal scrollbar doesn't overlap the last row.
+  const SCROLLBAR_PADDING = 14;
+  const fullHeight = useMemo(() => {
+    let height;
+    if (!multiTaskRows || !computedRowMapping) {
+      height = rTasks.length * rCellHeight;
+    } else {
+      // Collect unique rows in order and sum their heights
+      const seenRows = [];
+      rTasks.forEach((task) => {
+        const rowId = computedRowMapping.taskRows.get(task.id) ?? task.id;
+        if (!seenRows.includes(rowId)) {
+          seenRows.push(rowId);
+        }
+      });
+      height = 0;
+      for (const rowId of seenRows) {
+        height += (rowHeightOverrides && rowHeightOverrides[rowId]) || rCellHeight;
+      }
+    }
+    return height + SCROLLBAR_PADDING;
+  }, [rTasks, rCellHeight, multiTaskRows, computedRowMapping, rowHeightOverrides]);
   const scrollHeight = useMemo(
     () => rScales.height + fullHeight + scrollSize,
     [rScales, fullHeight, scrollSize],
@@ -105,8 +152,31 @@ function Layout(props) {
   );
 
   const chartRef = useRef(null);
+
+  // Suppress expand-scale for a short window after any zoom action so it
+  // doesn't fight the zoom direction (zoom-out shrinks content width →
+  // expand-scale would immediately widen it back).
+  const zoomLockRef = useRef(false);
+  const zoomLockTimer = useRef(null);
+
+  useEffect(() => {
+    const lock = () => {
+      zoomLockRef.current = true;
+      clearTimeout(zoomLockTimer.current);
+      zoomLockTimer.current = setTimeout(() => {
+        zoomLockRef.current = false;
+      }, 300);
+    };
+    api.on('zoom-scale', lock);
+    api.on('set-scale', lock);
+    return () => {
+      clearTimeout(zoomLockTimer.current);
+    };
+  }, [api]);
+
   const expandScale = useCallback(() => {
     Promise.resolve().then(() => {
+      if (zoomLockRef.current) return;
       if ((ganttWidth ?? 0) > (totalWidth ?? 0)) {
         const minWidth = (ganttWidth ?? 0) - gridWidth;
         api.exec('expand-scale', { minWidth });
@@ -114,20 +184,22 @@ function Layout(props) {
     });
   }, [ganttWidth, totalWidth, gridWidth, api]);
 
+  // Use a ref so the ResizeObserver always calls the latest expandScale
+  // without recreating the observer (which fires immediately on creation
+  // per spec, causing expand-scale to fight zoom-scale).
+  const expandScaleRef = useRef(expandScale);
+  expandScaleRef.current = expandScale;
+
   useEffect(() => {
     let ro;
     if (chartRef.current) {
-      ro = new ResizeObserver(expandScale);
+      ro = new ResizeObserver(() => expandScaleRef.current());
       ro.observe(chartRef.current);
     }
     return () => {
       if (ro) ro.disconnect();
     };
-  }, [chartRef.current, expandScale]);
-
-  useEffect(() => {
-    expandScale();
-  }, [fullWidth]);
+  }, [chartRef.current]);
 
   const ganttDivRef = useRef(null);
   const pseudoRowsRef = useRef(null);
@@ -271,6 +343,9 @@ function Layout(props) {
                   readonly={readonly}
                   fullHeight={fullHeight}
                   onTableAPIChange={onTableAPIChange}
+                  multiTaskRows={multiTaskRows}
+                  rowMapping={computedRowMapping}
+                  rowHeightOverrides={rowHeightOverrides}
                 />
                 <Resizer
                   value={gridWidth}
@@ -291,6 +366,14 @@ function Layout(props) {
                 taskTemplate={taskTemplate}
                 cellBorders={cellBorders}
                 highlightTime={highlightTime}
+                onScaleClick={onScaleClick}
+                multiTaskRows={multiTaskRows}
+                rowMapping={computedRowMapping}
+                rowHeightOverrides={rowHeightOverrides}
+                allowTaskIntersection={allowTaskIntersection}
+                summaryBarCounts={summaryBarCounts}
+                marqueeSelect={marqueeSelect}
+                copyPaste={copyPaste}
               />
             </div>
           </div>

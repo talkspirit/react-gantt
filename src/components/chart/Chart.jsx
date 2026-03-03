@@ -23,6 +23,14 @@ function Chart(props) {
     taskTemplate,
     cellBorders,
     highlightTime,
+    onScaleClick,
+    multiTaskRows = false,
+    rowMapping = null,
+    rowHeightOverrides = null,
+    allowTaskIntersection = true,
+    summaryBarCounts = false,
+    marqueeSelect = false,
+    copyPaste = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -39,30 +47,80 @@ function Chart(props) {
   const [chartHeight, setChartHeight] = useState();
   const chartRef = useRef(null);
 
+  const rTasks = useStore(api, '_tasks');
+
   const extraRows = 1 + (scales?.rows?.length || 0);
+
+  // Compute adjusted Y positions for multiTaskRows
+  const taskYPositions = useMemo(() => {
+    if (!multiTaskRows || !rowMapping || !rTasks?.length) return null;
+
+    const yMap = new Map();
+    const rowIndexMap = new Map();
+    const seenRows = [];
+
+    rTasks.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!rowIndexMap.has(rowId)) {
+        rowIndexMap.set(rowId, seenRows.length);
+        seenRows.push(rowId);
+      }
+    });
+
+    rTasks.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      const rowIndex = rowIndexMap.get(rowId) ?? 0;
+      yMap.set(task.id, rowIndex * cellHeight);
+    });
+
+    return yMap;
+  }, [rTasks, multiTaskRows, rowMapping, cellHeight]);
+
   const selectStyle = useMemo(() => {
     const t = [];
     if (selected && selected.length && cellHeight) {
       selected.forEach((obj) => {
-        t.push({ height: `${cellHeight}px`, top: `${obj.$y - 3}px` });
+        const adjustedY = taskYPositions?.get(obj.id) ?? obj.$y;
+        t.push({ height: `${cellHeight}px`, top: `${adjustedY - 3}px` });
       });
     }
     return t;
-  }, [selectedCounter, cellHeight]);
+  }, [selectedCounter, cellHeight, taskYPositions]);
 
   const chartGridHeight = useMemo(
     () => Math.max(chartHeight || 0, fullHeight),
     [chartHeight, fullHeight],
   );
 
+  // Compute rowLayout for CellGrid when variable row heights are active
+  const rowLayout = useMemo(() => {
+    if (!rowHeightOverrides || !multiTaskRows || !rowMapping || !rTasks?.length) return null;
+    // Check if any override actually differs from cellHeight
+    const hasOverride = Object.values(rowHeightOverrides).some((h) => h !== cellHeight);
+    if (!hasOverride) return null;
+
+    const seenRows = [];
+    rTasks.forEach((task) => {
+      const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
+      if (!seenRows.includes(rowId)) seenRows.push(rowId);
+    });
+    return seenRows.map((rowId) => ({
+      id: rowId,
+      height: rowHeightOverrides[rowId] || cellHeight,
+    }));
+  }, [rTasks, rowMapping, rowHeightOverrides, multiTaskRows, cellHeight]);
+
   useEffect(() => {
     const el = chartRef.current;
     if (!el) return;
 
     if (typeof rScrollTop === 'number') {
-      el.scrollTop = rScrollTop;
+      // When multiTaskRows is enabled, all bars are positioned absolutely using
+      // cumulative Y offsets. Skip SVAR's scroll offset to prevent bars from
+      // being pushed off screen by a stale scrollTop value.
+      el.scrollTop = multiTaskRows ? 0 : rScrollTop;
     }
-  }, [rScrollTop]);
+  }, [rScrollTop, multiTaskRows]);
 
   const onScroll = () => {
     const scroll = { left: true };
@@ -213,7 +271,7 @@ function Chart(props) {
       ref={chartRef}
       onScroll={onScroll}
     >
-      <TimeScales highlightTime={highlightTime} scales={scales} />
+      <TimeScales highlightTime={highlightTime} onScaleClick={onScaleClick} scales={scales} />
       {markers && markers.length ? (
         <div
           className="wx-mR7v2Xag wx-markers"
@@ -255,7 +313,7 @@ function Chart(props) {
           </div>
         ) : null}
 
-        <CellGrid borders={cellBorders} />
+        <CellGrid borders={cellBorders} rowLayout={rowLayout} />
 
         {selected && selected.length
           ? selected.map((obj, index) =>
@@ -270,7 +328,17 @@ function Chart(props) {
             )
           : null}
 
-        <Bars readonly={readonly} taskTemplate={taskTemplate} />
+        <Bars
+          readonly={readonly}
+          taskTemplate={taskTemplate}
+          multiTaskRows={multiTaskRows}
+          rowMapping={rowMapping}
+          rowHeightOverrides={rowHeightOverrides}
+          allowTaskIntersection={allowTaskIntersection}
+          summaryBarCounts={summaryBarCounts}
+          marqueeSelect={marqueeSelect}
+          copyPaste={copyPaste}
+        />
       </div>
     </div>
   );
