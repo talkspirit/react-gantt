@@ -834,6 +834,9 @@
   font: var(--wx-tooltip-font);
   color: var(--wx-tooltip-font-color);
 }
+.wx-gantt-tooltip--touch.wx-gantt-tooltip {
+  transform: translate(-50%) translateY(-100%);
+}
 .wx-QSwitwNQ,
 .wx-material-theme {
   --wx-gantt-border-color: #e6e6e6;

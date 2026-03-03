@@ -10,6 +10,7 @@ function Tooltip(props) {
   const [areaCoords, setAreaCoords] = useState({});
   const [tooltipData, setTooltipData] = useState(null);
   const [pos, setPos] = useState({});
+  const [isTouch, setIsTouch] = useState(false);
 
   function findAttribute(node) {
     while (node) {
@@ -27,6 +28,8 @@ function Tooltip(props) {
 
   useEffect(() => {
     const tooltipNode = tooltipNodeRef.current;
+    // Skip boundary clamping for touch tooltips (they use CSS transform centering)
+    if (isTouch) return;
     if (tooltipNode && pos && (pos.text || Content)) {
       const tooltipCoords = tooltipNode.getBoundingClientRect();
 
@@ -50,7 +53,7 @@ function Tooltip(props) {
         });
       }
     }
-  }, [pos, areaCoords, Content]);
+  }, [pos, areaCoords, Content, isTouch]);
 
   const timerRef = useRef(null);
   const TIMEOUT = 300;
@@ -65,6 +68,7 @@ function Tooltip(props) {
     let { id, tooltip, target, at } = findAttribute(e.target);
     setPos(null);
     setTooltipData(null);
+    setIsTouch(false);
 
     if (!tooltip) {
       if (!id) {
@@ -102,6 +106,40 @@ function Tooltip(props) {
     });
   }
 
+  function touchStart(e) {
+    const touch = e.touches[0];
+    if (!touch) return;
+    const { id, target } = findAttribute(e.target);
+    if (!id) return;
+
+    // Show immediately — no debounce for touch
+    clearTimeout(timerRef.current);
+    const taskData = getTaskObj(prepareId(id));
+    const tooltip = taskData?.text || '';
+
+    const targetCoords = target.getBoundingClientRect();
+    const areaEl = areaRef.current;
+    const areaRect = areaEl
+      ? areaEl.getBoundingClientRect()
+      : { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
+
+    setTooltipData(taskData);
+    setAreaCoords(areaRect);
+    setIsTouch(true);
+    // Position above the bar, centered on touch X
+    setPos({
+      top: targetCoords.top - areaRect.top - 8,
+      left: touch.clientX - areaRect.left,
+      text: tooltip,
+    });
+  }
+
+  function touchDismiss() {
+    setPos(null);
+    setTooltipData(null);
+    setIsTouch(false);
+  }
+
   function getTaskObj(id) {
     return api?.getTask(prepareId(id)) || null;
   }
@@ -115,15 +153,26 @@ function Tooltip(props) {
     return isNaN(numId) ? id : numId;
   }
 
+  const tooltipClass = [
+    'wx-KG0Lwsqo',
+    'wx-gantt-tooltip',
+    isTouch ? 'wx-gantt-tooltip--touch' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div
       className="wx-KG0Lwsqo wx-tooltip-area"
       ref={areaRef}
       onMouseMove={move}
+      onTouchStart={touchStart}
+      onTouchEnd={touchDismiss}
+      onTouchMove={touchDismiss}
     >
       {pos && (pos.text || Content) ? (
         <div
-          className="wx-KG0Lwsqo wx-gantt-tooltip"
+          className={tooltipClass}
           ref={tooltipNodeRef}
           style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
         >
