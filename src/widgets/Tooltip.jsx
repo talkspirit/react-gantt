@@ -94,6 +94,11 @@ function Tooltip(props) {
   }
 
   function move(e) {
+    // Ignore mousemove events bubbling up from the tooltip itself
+    if (tooltipNodeRef.current && tooltipNodeRef.current.contains(e.target)) {
+      return;
+    }
+
     let { id, tooltip, target, at } = findAttribute(e.target);
 
     // Left the bar area — schedule dismiss (user may be moving to tooltip)
