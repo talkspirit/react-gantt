@@ -3975,7 +3975,7 @@ function Rs(t) {
   const m = ne(null),
     Y = ne(null),
     O = 300,
-    re = 150,
+    re = 300,
     Z = (N) => {
       clearTimeout(m.current),
         (m.current = setTimeout(() => {
@@ -3983,16 +3983,22 @@ function Rs(t) {
         }, O));
     };
   function E() {
-    clearTimeout(m.current), (Y.current = null), x(null), R(null), _(!1);
+    clearTimeout(m.current),
+      clearTimeout(v.current),
+      (Y.current = null),
+      (G.current = !1),
+      x(null),
+      R(null),
+      _(!1);
   }
   function we() {
-    clearTimeout(v.current),
+    v.current ||
       (v.current = setTimeout(() => {
-        G.current || E();
+        (v.current = null), G.current || E();
       }, re));
   }
   function le() {
-    clearTimeout(v.current);
+    clearTimeout(v.current), (v.current = null);
   }
   function ye(N) {
     if (k.current && k.current.contains(N.target)) return;

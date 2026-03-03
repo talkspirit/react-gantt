@@ -62,7 +62,7 @@ function Tooltip(props) {
   const timerRef = useRef(null);
   const activeIdRef = useRef(null);
   const TIMEOUT = 300;
-  const DISMISS_DELAY = 150;
+  const DISMISS_DELAY = 300;
 
   const debounce = (code) => {
     clearTimeout(timerRef.current);
@@ -73,16 +73,20 @@ function Tooltip(props) {
 
   function dismiss() {
     clearTimeout(timerRef.current);
+    clearTimeout(dismissTimerRef.current);
     activeIdRef.current = null;
+    overTooltipRef.current = false;
     setPos(null);
     setTooltipData(null);
     setIsTouch(false);
   }
 
-  // Delayed dismiss — gives the user time to move from bar → tooltip
+  // Delayed dismiss — gives the user time to move from bar → tooltip.
+  // Only schedules if no timer is already pending (don't restart on each mousemove).
   function scheduleDismiss() {
-    clearTimeout(dismissTimerRef.current);
+    if (dismissTimerRef.current) return;
     dismissTimerRef.current = setTimeout(() => {
+      dismissTimerRef.current = null;
       if (!overTooltipRef.current) {
         dismiss();
       }
@@ -91,6 +95,7 @@ function Tooltip(props) {
 
   function cancelDismiss() {
     clearTimeout(dismissTimerRef.current);
+    dismissTimerRef.current = null;
   }
 
   function move(e) {
