@@ -112,15 +112,8 @@ function Tooltip(props) {
       tooltip = getTaskText(id);
     }
 
-    // Still hovering the same bar — keep tooltip visible, just update cursor X
+    // Still hovering the same bar — keep tooltip in place
     if (activeIdRef.current === id && pos) {
-      const areaEl = areaRef.current;
-      const areaRect = areaEl
-        ? areaEl.getBoundingClientRect()
-        : { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0 };
-      if (at !== 'left') {
-        setPos((prev) => (prev ? { ...prev, left: e.clientX - areaRect.left } : prev));
-      }
       return;
     }
 
