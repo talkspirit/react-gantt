@@ -98,7 +98,10 @@ export declare const Editor: FC<
 export declare const Tooltip: FC<{
   content?: FC<{
     data: ITask;
+    api?: IApi;
   }>;
+  /** Return false to suppress the tooltip for a given task. */
+  filter?: (data: ITask) => boolean;
   api?: IApi;
   children?: ReactNode;
 }>;

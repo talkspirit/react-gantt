@@ -2,10 +2,12 @@
   position: relative;
   height: 100%;
   width: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .wx-gantt-tooltip {
-  pointer-events: none;
+  pointer-events: auto;
   position: absolute;
   z-index: 10;
   box-shadow: var(--wx-box-shadow);
@@ -18,4 +20,9 @@
   background-color: var(--wx-tooltip-background);
   font: var(--wx-tooltip-font);
   color: var(--wx-tooltip-font-color);
+}
+
+/* Touch tooltip: center above the touch point */
+.wx-gantt-tooltip--touch.wx-gantt-tooltip {
+  transform: translateX(-50%) translateY(-100%);
 }
