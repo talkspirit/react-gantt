@@ -11292,11 +11292,14 @@ function vu(n, e) {
     const g = Math.max(40, Math.min(d * 0.3, 160)),
       m = Math.max(60, Math.min(d * 0.4, 200)),
       h = Math.max(40, Math.min(d * 0.2, 100)),
-      x = i >= 0 ? 1 : -1,
-      w = r[0] + (a ? g : -g),
-      y = r[1] + x * h,
-      b = s[0] + (l ? -m : m);
-    f += ` C${w},${y} ${b},${s[1]} ${s[0]},${s[1]}`;
+      x = Math.abs(i),
+      w = i >= 0 ? 1 : -1,
+      y = r[0] + (a ? g : -g),
+      b = r[1] + w * h,
+      v = s[0] + (l ? -m : m),
+      M = Math.max(20, Math.min(x * 0.5, 80)),
+      S = s[1] - w * M;
+    f += ` C${y},${b} ${v},${S} ${s[0]},${s[1]}`;
   } else {
     const g = Math.max(40, Math.min(u * 0.5, 150)),
       m = r[0] + (a ? g : -g),

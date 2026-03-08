@@ -112,13 +112,18 @@ function pointsToBezierPath(pString, linkType) {
     const hOff = Math.max(40, Math.min(absDx * 0.3, 160));
     const hOff2 = Math.max(60, Math.min(absDx * 0.4, 200));
     const vOff = Math.max(40, Math.min(absDx * 0.2, 100));
+    const absDy = Math.abs(dy);
     const yDir = dy >= 0 ? 1 : -1;
 
     const cp1x = start[0] + (sourceExitsRight ? hOff : -hOff);
     const cp1y = start[1] + yDir * vOff;
     const cp2x = end[0] + (targetEntersLeft ? -hOff2 : hOff2);
+    // Offset cp2y so the curve approaches from above/below rather than
+    // arriving perfectly horizontal. Scale with vertical distance.
+    const cp2yOff = Math.max(20, Math.min(absDy * 0.5, 80));
+    const cp2y = end[1] - yDir * cp2yOff;
 
-    d += ` C${cp1x},${cp1y} ${cp2x},${end[1]} ${end[0]},${end[1]}`;
+    d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${end[0]},${end[1]}`;
   } else {
     const offset = Math.max(40, Math.min(dist * 0.5, 150));
     const cp1x = start[0] + (sourceExitsRight ? offset : -offset);
