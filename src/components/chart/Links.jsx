@@ -80,9 +80,9 @@ function pointsToRoundedPath(pString, radius = 8) {
 }
 
 function pointsToBezierPath(pString, linkType) {
-  if (!pString) return '';
+  if (!pString) return { d: '', end: null, cp2: null };
   const { path } = parsePoints(pString);
-  if (path.length < 2) return '';
+  if (path.length < 2) return { d: '', end: null, cp2: null };
 
   const start = path[0];
   const end = path[path.length - 1];
@@ -105,6 +105,7 @@ function pointsToBezierPath(pString, linkType) {
   const absDx = Math.abs(dx);
 
   let d = `M${start[0]},${start[1]}`;
+  let cp2;
 
   if (isBackward) {
     // For backward links, use reduced horizontal offset + larger vertical
@@ -122,23 +123,53 @@ function pointsToBezierPath(pString, linkType) {
     // arriving perfectly horizontal. Scale with vertical distance.
     const cp2yOff = Math.max(20, Math.min(absDy * 0.5, 80));
     const cp2y = end[1] - yDir * cp2yOff;
+    cp2 = [cp2x, cp2y];
 
     d += ` C${cp1x},${cp1y} ${cp2x},${cp2y} ${end[0]},${end[1]}`;
   } else {
     const offset = Math.max(40, Math.min(dist * 0.5, 150));
     const cp1x = start[0] + (sourceExitsRight ? offset : -offset);
     const cp2x = end[0] + (targetEntersLeft ? -offset : offset);
+    cp2 = [cp2x, end[1]];
 
     d += ` C${cp1x},${start[1]} ${cp2x},${end[1]} ${end[0]},${end[1]}`;
   }
 
-  return d;
+  return { d, end, cp2 };
+}
+
+/** Compute arrowhead triangle aligned to the bezier tangent at the endpoint. */
+function bezierArrowhead(end, cp2, size = 5) {
+  // Tangent at t=1 of cubic bezier is proportional to (end - cp2)
+  const tx = end[0] - cp2[0];
+  const ty = end[1] - cp2[1];
+  const len = Math.hypot(tx, ty);
+  if (len === 0) return null;
+  // Unit tangent and perpendicular
+  const ux = tx / len;
+  const uy = ty / len;
+  const px = -uy;
+  const py = ux;
+  // Triangle: tip at endpoint, base 10px back along tangent
+  const tipX = end[0];
+  const tipY = end[1];
+  const baseX = end[0] - ux * 10;
+  const baseY = end[1] - uy * 10;
+  return `${baseX - px * size},${baseY - py * size} ${tipX},${tipY} ${baseX + px * size},${baseY + py * size}`;
 }
 
 function toPathD(pString, linkShape, linkType) {
-  return linkShape === 'bezier'
-    ? pointsToBezierPath(pString, linkType)
-    : pointsToRoundedPath(pString);
+  if (linkShape === 'bezier') {
+    const result = pointsToBezierPath(pString, linkType);
+    return result.d;
+  }
+  return pointsToRoundedPath(pString);
+}
+
+function toBezierArrow(pString, linkType) {
+  const { end, cp2 } = pointsToBezierPath(pString, linkType);
+  if (!end || !cp2) return null;
+  return bezierArrowhead(end, cp2);
 }
 
 // ---------------------------------------------------------------------------
@@ -636,8 +667,8 @@ export default function Links({
       // For bezier, draw arrowhead as explicit filled polygon so it covers
       // the curve stroke cleanly (SVG markers can't mask the underlying path).
       if (isBezierLink && link.$p) {
-        const { arrow } = parsePoints(link.$p);
-        const arrowPoints = arrow.map((p) => p.join(',')).join(' ');
+        const arrowPoints = toBezierArrow(link.$p, link.type) ||
+          parsePoints(link.$p).arrow.map((p) => p.join(',')).join(' ');
 
         // Determine arrow fill
         let arrowFill;
