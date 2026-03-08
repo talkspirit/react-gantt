@@ -55,7 +55,10 @@ export default function Grid(props) {
   const tasks = useMemo(() => {
     if (!rTasksVal || !areaVal) return [];
 
-    // When multiTaskRows is enabled, de-duplicate: show one row per unique visual row
+    // When multiTaskRows is enabled, de-duplicate: show one row per unique visual row.
+    // Include fullHeight in deps so WxGrid re-renders when the layout settles — on
+    // first render the container is small and WxGrid only creates rows that fit;
+    // once fullHeight stabilizes we return a fresh array reference to force a re-render.
     if (multiTaskRows && rowMapping) {
       const seenRows = new Set();
       return rTasksVal.filter((task) => {
@@ -67,7 +70,7 @@ export default function Grid(props) {
     }
 
     return rTasksVal.slice(areaVal.start, areaVal.end);
-  }, [rTasksVal, areaVal, multiTaskRows, rowMapping]);
+  }, [rTasksVal, areaVal, multiTaskRows, rowMapping, fullHeight]);
 
   const execAction = useCallback(
     (id, action) => {
@@ -175,8 +178,15 @@ export default function Grid(props) {
     } else if (display === 'grid') {
       style.width = '100%';
     }
+    // When multiTaskRows bypasses virtual scroll, ensure WxGrid's container is
+    // tall enough for all rows from the first render. Without this, WxGrid only
+    // creates rows that fit the initial (small) container and never re-creates
+    // the missing ones even after the layout stabilizes.
+    if (multiTaskRows && fullHeight) {
+      style.minHeight = fullHeight;
+    }
     return style;
-  }, [scrollX, display, columnWidth]);
+  }, [scrollX, display, columnWidth, multiTaskRows, fullHeight]);
 
   const allTasks = useMemo(() => {
     if (dragTask && !tasks.find((t) => t.id === dragTask.id)) {
@@ -400,6 +410,10 @@ export default function Grid(props) {
   // any rowHeightOverrides on top. Also patch the body container height
   // since WxGrid computes it from `sizes.rowHeight` (uniform) rather than
   // variable per-row heights.
+  //
+  // Uses a MutationObserver to re-apply heights whenever WxGrid re-renders
+  // and resets the body height (e.g. after select-task triggers a re-render
+  // with uniform row heights, potentially via rAF).
   useEffect(() => {
     if (!multiTaskRows) return;
     const tableEl = tableRef.current;
@@ -407,21 +421,61 @@ export default function Grid(props) {
     const bodyEl = tableEl.querySelector('.wx-table-box .wx-body');
     if (!bodyEl) return;
 
-    let totalHeight = 0;
-    const rows = bodyEl.querySelectorAll('[data-id]');
-    rows.forEach((rowEl) => {
-      const id = rowEl.getAttribute('data-id');
-      const h = (rowHeightOverrides && id && rowHeightOverrides[id]) || cellHeightVal;
-      rowEl.style.height = `${h}px`;
-      rowEl.style.minHeight = `${h}px`;
-      totalHeight += h;
+    const observerConfig = {
+      attributes: true,
+      attributeFilter: ['style'],
+      childList: true,
+    };
+
+    let rafId = null;
+    let observer;
+
+    const applyHeights = () => {
+      // Disconnect before writing to prevent triggering ourselves
+      observer.disconnect();
+
+      let totalHeight = 0;
+      const rows = bodyEl.querySelectorAll('[data-id]');
+      rows.forEach((rowEl) => {
+        const taskId = rowEl.getAttribute('data-id');
+        // Translate task ID → row ID for override lookup (they may differ)
+        const id =
+          rowMapping && taskId
+            ? (rowMapping.taskRows.get(taskId) ??
+              rowMapping.taskRows.get(Number(taskId)) ??
+              taskId)
+            : taskId;
+        const h =
+          (rowHeightOverrides && id && rowHeightOverrides[id]) || cellHeightVal;
+        rowEl.style.height = `${h}px`;
+        rowEl.style.minHeight = `${h}px`;
+        totalHeight += h;
+      });
+
+      // Override body container height to match sum of variable row heights
+      if (totalHeight > 0) {
+        bodyEl.style.height = `${totalHeight}px`;
+      }
+
+      // Reconnect to catch future WxGrid re-renders
+      observer.observe(bodyEl, observerConfig);
+    };
+
+    observer = new MutationObserver(() => {
+      // Debounce with rAF so multiple mutations in one frame
+      // only trigger a single height re-application
+      if (rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(applyHeights);
     });
 
-    // Override body container height to match sum of variable row heights
-    if (totalHeight > 0) {
-      bodyEl.style.height = `${totalHeight}px`;
-    }
-  }, [rowHeightOverrides, multiTaskRows, allTasks, cellHeightVal]);
+    // Apply immediately, then watch for resets
+    applyHeights();
+
+    return () => {
+      observer.disconnect();
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [rowHeightOverrides, multiTaskRows, allTasks, cellHeightVal, rowMapping]);
 
   const startReorder = useCallback(
     ({ id }) => {

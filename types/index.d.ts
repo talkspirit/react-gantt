@@ -23,6 +23,15 @@ import type {
 } from '@svar-ui/gantt-store';
 
 export * from '@svar-ui/gantt-store';
+
+declare module '@svar-ui/gantt-store' {
+  interface ITask {
+    /** Hide the bar in the chart while keeping the grid row visible. Used with multiTaskRows for collapsible section headers. */
+    barHidden?: boolean;
+    /** Assign tasks to the same row for lane packing in multiTaskRows mode. */
+    row?: string | number;
+  }
+}
 export { ICellProps } from '@svar-ui/react-grid';
 export { registerEditorItem } from '@svar-ui/react-editor';
 
@@ -60,6 +69,10 @@ export declare const Gantt: ForwardRefExoticComponent<
     summaryBarCounts?: boolean;
     marqueeSelect?: boolean;
     copyPaste?: boolean;
+    linkShape?: 'squared' | 'rounded' | 'bezier';
+    linkGradient?: boolean;
+    linkStyle?: 'solid' | 'dashed' | 'dotted';
+    linkBundling?: boolean;
     init?: (api: IApi) => void;
   } & IConfig &
     GanttActions<

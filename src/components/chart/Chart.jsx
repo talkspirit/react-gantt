@@ -31,6 +31,10 @@ function Chart(props) {
     summaryBarCounts = false,
     marqueeSelect = false,
     copyPaste = false,
+    linkShape,
+    linkGradient = false,
+    linkStyle,
+    linkBundling = false,
   } = props;
 
   const api = useContext(storeContext);
@@ -51,41 +55,58 @@ function Chart(props) {
 
   const extraRows = 1 + (scales?.rows?.length || 0);
 
-  // Compute adjusted Y positions for multiTaskRows
-  const taskYPositions = useMemo(() => {
-    if (!multiTaskRows || !rowMapping || !rTasks?.length) return null;
+  // Compute adjusted Y positions for multiTaskRows using cumulative heights
+  // (not rowIndex * cellHeight) to account for variable row heights.
+  const { taskYPositions, rowHeightMap } = useMemo(() => {
+    if (!multiTaskRows || !rowMapping || !rTasks?.length)
+      return { taskYPositions: null, rowHeightMap: null };
 
     const yMap = new Map();
-    const rowIndexMap = new Map();
+    const heightMap = new Map();
     const seenRows = [];
 
     rTasks.forEach((task) => {
       const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
-      if (!rowIndexMap.has(rowId)) {
-        rowIndexMap.set(rowId, seenRows.length);
+      if (!seenRows.includes(rowId)) {
         seenRows.push(rowId);
       }
     });
 
+    // Build cumulative Y offsets using actual row heights
+    const rowYOffsets = new Map();
+    let cumulativeY = 0;
+    for (const rowId of seenRows) {
+      rowYOffsets.set(rowId, cumulativeY);
+      const rowH =
+        (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+      heightMap.set(rowId, rowH);
+      cumulativeY += rowH;
+    }
+
     rTasks.forEach((task) => {
       const rowId = rowMapping.taskRows.get(task.id) ?? task.id;
-      const rowIndex = rowIndexMap.get(rowId) ?? 0;
-      yMap.set(task.id, rowIndex * cellHeight);
+      yMap.set(task.id, rowYOffsets.get(rowId) ?? 0);
     });
 
-    return yMap;
-  }, [rTasks, multiTaskRows, rowMapping, cellHeight]);
+    return { taskYPositions: yMap, rowHeightMap: heightMap };
+  }, [rTasks, multiTaskRows, rowMapping, cellHeight, rowHeightOverrides]);
 
   const selectStyle = useMemo(() => {
     const t = [];
     if (selected && selected.length && cellHeight) {
       selected.forEach((obj) => {
         const adjustedY = taskYPositions?.get(obj.id) ?? obj.$y;
-        t.push({ height: `${cellHeight}px`, top: `${adjustedY - 3}px` });
+        // Use the row's actual height for selection highlight
+        let h = cellHeight;
+        if (rowHeightMap && rowMapping) {
+          const rowId = rowMapping.taskRows.get(obj.id) ?? obj.id;
+          h = rowHeightMap.get(rowId) ?? cellHeight;
+        }
+        t.push({ height: `${h}px`, top: `${adjustedY - 3}px` });
       });
     }
     return t;
-  }, [selectedCounter, cellHeight, taskYPositions]);
+  }, [selectedCounter, cellHeight, taskYPositions, rowHeightMap, rowMapping]);
 
   const chartGridHeight = useMemo(
     () => Math.max(chartHeight || 0, fullHeight),
@@ -94,9 +115,12 @@ function Chart(props) {
 
   // Compute rowLayout for CellGrid when variable row heights are active
   const rowLayout = useMemo(() => {
-    if (!rowHeightOverrides || !multiTaskRows || !rowMapping || !rTasks?.length) return null;
+    if (!rowHeightOverrides || !multiTaskRows || !rowMapping || !rTasks?.length)
+      return null;
     // Check if any override actually differs from cellHeight
-    const hasOverride = Object.values(rowHeightOverrides).some((h) => h !== cellHeight);
+    const hasOverride = Object.values(rowHeightOverrides).some(
+      (h) => h !== cellHeight,
+    );
     if (!hasOverride) return null;
 
     const seenRows = [];
@@ -262,8 +286,8 @@ function Chart(props) {
     };
   }, [onWheel]);
 
-  useRenderTime("chart");
-  
+  useRenderTime('chart');
+
   return (
     <div
       className="wx-mR7v2Xag wx-chart"
@@ -271,7 +295,11 @@ function Chart(props) {
       ref={chartRef}
       onScroll={onScroll}
     >
-      <TimeScales highlightTime={highlightTime} onScaleClick={onScaleClick} scales={scales} />
+      <TimeScales
+        highlightTime={highlightTime}
+        onScaleClick={onScaleClick}
+        scales={scales}
+      />
       {markers && markers.length ? (
         <div
           className="wx-mR7v2Xag wx-markers"
@@ -338,6 +366,10 @@ function Chart(props) {
           summaryBarCounts={summaryBarCounts}
           marqueeSelect={marqueeSelect}
           copyPaste={copyPaste}
+          linkShape={linkShape}
+          linkGradient={linkGradient}
+          linkStyle={linkStyle}
+          linkBundling={linkBundling}
         />
       </div>
     </div>
