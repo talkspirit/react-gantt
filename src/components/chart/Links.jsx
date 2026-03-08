@@ -57,6 +57,13 @@ function pointsToRoundedPath(pString, radius = 8) {
 
     const len1 = Math.hypot(dx1, dy1);
     const len2 = Math.hypot(dx2, dy2);
+
+    // Zero-length segment (duplicate waypoints) — skip rounding to avoid NaN
+    if (len1 === 0 || len2 === 0) {
+      d += ` L${curr[0]},${curr[1]}`;
+      continue;
+    }
+
     const r = Math.min(radius, len1 / 2, len2 / 2);
 
     const beforeX = curr[0] - (dx1 / len1) * r;

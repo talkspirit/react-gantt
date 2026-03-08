@@ -11260,8 +11260,12 @@ function xu(n, e = 8) {
       continue;
     }
     const f = Math.hypot(l, c),
-      h = Math.hypot(u, d),
-      m = Math.min(e, f / 2, h / 2),
+      h = Math.hypot(u, d);
+    if (f === 0 || h === 0) {
+      r += ` L${i[0]},${i[1]}`;
+      continue;
+    }
+    const m = Math.min(e, f / 2, h / 2),
       g = i[0] - (l / f) * m,
       y = i[1] - (c / f) * m,
       w = i[0] + (u / h) * m,
