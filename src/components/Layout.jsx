@@ -40,6 +40,7 @@ function Layout(props) {
     linkGradient = false,
     linkStyle,
     linkBundling = false,
+    showProgress = true,
   } = props;
 
   const api = useContext(storeContext);
@@ -423,6 +424,7 @@ function Layout(props) {
                 linkGradient={linkGradient}
                 linkStyle={linkStyle}
                 linkBundling={linkBundling}
+                showProgress={showProgress}
               />
             </div>
           </div>

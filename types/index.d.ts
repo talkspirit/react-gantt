@@ -73,6 +73,8 @@ export declare const Gantt: ForwardRefExoticComponent<
     linkGradient?: boolean;
     linkStyle?: 'solid' | 'dashed' | 'dotted';
     linkBundling?: boolean;
+    /** Show the progress fill and draggable marker on task bars (default: true). */
+    showProgress?: boolean;
     init?: (api: IApi) => void;
   } & IConfig &
     GanttActions<

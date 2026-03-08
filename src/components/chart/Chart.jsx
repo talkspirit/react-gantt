@@ -35,6 +35,7 @@ function Chart(props) {
     linkGradient = false,
     linkStyle,
     linkBundling = false,
+    showProgress = true,
   } = props;
 
   const api = useContext(storeContext);
@@ -370,6 +371,7 @@ function Chart(props) {
           linkGradient={linkGradient}
           linkStyle={linkStyle}
           linkBundling={linkBundling}
+          showProgress={showProgress}
         />
       </div>
     </div>

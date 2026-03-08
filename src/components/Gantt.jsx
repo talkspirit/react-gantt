@@ -108,6 +108,7 @@ const Gantt = forwardRef(function Gantt(
     linkGradient = false,
     linkStyle,
     linkBundling = false,
+    showProgress = true,
     summary = null,
     _export = false,
     ...restProps
@@ -433,6 +434,7 @@ const Gantt = forwardRef(function Gantt(
           linkGradient={linkGradient}
           linkStyle={linkStyle}
           linkBundling={linkBundling}
+          showProgress={showProgress}
         />
       </StoreContext.Provider>
     </context.i18n.Provider>

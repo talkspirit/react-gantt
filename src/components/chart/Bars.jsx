@@ -100,6 +100,7 @@ function Bars(props) {
     linkGradient = false,
     linkStyle,
     linkBundling = false,
+    showProgress = true,
   } = props;
 
   const api = useContext(storeContext);
@@ -1552,7 +1553,7 @@ function Bars(props) {
 
                 {task.type !== 'milestone' ? (
                   <>
-                    {task.progress && !(splitTasks && task.segments) ? (
+                    {showProgress && task.progress && !(splitTasks && task.segments) ? (
                       <div className="wx-GKbcLEGA wx-progress-wrapper">
                         <div
                           className="wx-GKbcLEGA wx-progress-percent"
@@ -1560,7 +1561,8 @@ function Bars(props) {
                         ></div>
                       </div>
                     ) : null}
-                    {!readonly &&
+                    {showProgress &&
+                    !readonly &&
                     !(splitTasks && task.segments) &&
                     !(task.type == 'summary' && summary?.autoProgress) ? (
                       <div
