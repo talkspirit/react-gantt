@@ -11690,7 +11690,9 @@ function _u({
                 /* @__PURE__ */ p('polygon', {
                   points: ke,
                   fill: $e,
-                  className: 'wx-dkx3NwEn',
+                  className:
+                    'wx-dkx3NwEn wx-bezier-arrow' +
+                    (P ? ' wx-bezier-arrow-selected' : ''),
                 }),
               ],
             },

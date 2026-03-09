@@ -177,6 +177,12 @@
 .wx-line-hitarea.wx-dkx3NwEn:hover + .wx-line-visible.wx-critical.wx-dkx3NwEn {
   stroke: var(--wx-gantt-link-critical-color-hovered);
 }
+.wx-line-hitarea.wx-dkx3NwEn:hover ~ .wx-bezier-arrow.wx-dkx3NwEn {
+  fill: var(--wx-gantt-link-color-hovered);
+}
+.wx-bezier-arrow-selected.wx-dkx3NwEn {
+  fill: var(--wx-color-danger);
+}
 .wx-line-selectable.wx-dkx3NwEn {
   cursor: pointer;
 }

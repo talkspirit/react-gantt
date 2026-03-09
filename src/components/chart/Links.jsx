@@ -705,7 +705,10 @@ export default function Links({
             <polygon
               points={arrowPoints}
               fill={arrowFill}
-              className="wx-dkx3NwEn"
+              className={
+                'wx-dkx3NwEn wx-bezier-arrow' +
+                (isSelected ? ' wx-bezier-arrow-selected' : '')
+              }
             />
           </Fragment>
         );
