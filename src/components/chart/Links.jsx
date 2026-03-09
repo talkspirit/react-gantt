@@ -687,7 +687,7 @@ export default function Links({
         }
 
         return (
-          <Fragment key={link.id}>
+          <g key={link.id}>
             <path
               className={hitareaClass}
               d={d}
@@ -710,7 +710,7 @@ export default function Links({
                 (isSelected ? ' wx-bezier-arrow-selected' : '')
               }
             />
-          </Fragment>
+          </g>
         );
       }
 

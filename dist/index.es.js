@@ -7,7 +7,7 @@ import {
   useCallback as K,
   useRef as st,
   useEffect as at,
-  Fragment as pe,
+  Fragment as Ce,
   forwardRef as je,
   useImperativeHandle as Qe,
 } from 'react';
@@ -32,10 +32,10 @@ import {
   locate as Vt,
   locateID as Zt,
   locateAttr as En,
-  dateToString as we,
-  locale as xe,
+  dateToString as pe,
+  locale as we,
 } from '@svar-ui/lib-dom';
-import { en as ye } from '@svar-ui/gantt-locales';
+import { en as xe } from '@svar-ui/gantt-locales';
 import { en as De } from '@svar-ui/core-locales';
 import { EventBusRouter as Ln } from '@svar-ui/lib-state';
 import {
@@ -1266,7 +1266,7 @@ function sr({
             xt = ge(pt, _) || _.current?.link || 'var(--wx-gantt-link-color)';
           } else xt = 'var(--wx-gantt-link-color)';
           return /* @__PURE__ */ At(
-            pe,
+            'g',
             {
               children: [
                 /* @__PURE__ */ d('path', {
@@ -1296,7 +1296,7 @@ function sr({
           );
         }
         return /* @__PURE__ */ At(
-          pe,
+          Ce,
           {
             children: [
               /* @__PURE__ */ d('path', {
@@ -1321,7 +1321,7 @@ function sr({
       }
       const Lt = Qn(T.$p);
       return /* @__PURE__ */ At(
-        pe,
+        Ce,
         {
           children: [
             /* @__PURE__ */ d('polyline', {
@@ -1497,8 +1497,8 @@ function or(t) {
     ),
   });
 }
-let Te = [],
-  Me = null,
+let $e = [],
+  Te = null,
   Fe = null;
 const Ve = (t, r, n, o) => t < o && r > n,
   qe = (t, r) => {
@@ -1617,8 +1617,8 @@ function lr(t) {
             if (
               !ht[Gt].some((Jt) => {
                 const he = Jt.$x ?? 0,
-                  $e = he + (Jt.$w ?? 0);
-                return Ve(It, Kt, he, $e);
+                  ke = he + (Jt.$w ?? 0);
+                return Ve(It, Kt, he, ke);
               })
             ) {
               ht[Gt].push(Dt), f.set(Dt.id, Gt), (Ft = !0);
@@ -1848,7 +1848,7 @@ function lr(t) {
         x = e
           .map((H) => {
             if (!p.getTask(H.id)) return null;
-            const ht = L.find(($e) => $e.id === H.id);
+            const ht = L.find((ke) => ke.id === H.id);
             if (!ht) return null;
             const {
                 $x: Ot,
@@ -1881,12 +1881,12 @@ function lr(t) {
         (H, ut) => (ut.start && (!H || ut.start < H) ? ut.start : H),
         null,
       );
-      (Te = A.map((H) => ({
+      ($e = A.map((H) => ({
         ...H,
         _startCellOffset: ir(H.start, j, V),
       }))),
         (Fe = $),
-        (Me = j);
+        (Te = j);
     }, [g, p, L, V]),
     on = K(
       (e, m, x) => {
@@ -1929,11 +1929,11 @@ function lr(t) {
             if (m.key === 'ctrl+c' || m.key === 'meta+c') return Ee(), !1;
             if (m.key === 'ctrl+v' || m.key === 'meta+v')
               return (
-                !Te.length ||
-                  !Me ||
+                !$e.length ||
+                  !Te ||
                   St({
-                    tasks: Te,
-                    baseDate: Me,
+                    tasks: $e,
+                    baseDate: Te,
                     parent: Fe,
                     currentX: N.current,
                   }),
@@ -2112,7 +2112,7 @@ function lr(t) {
       },
       [W, Q, ee],
     ),
-    be = K((e) => {
+    ye = K((e) => {
       Mt(e);
     }, []),
     ne = K(
@@ -2309,7 +2309,7 @@ function lr(t) {
                 inProgress: !0,
               });
           } else if (Et) {
-            be(null);
+            ye(null);
             const {
                 mode: f,
                 l: $,
@@ -2365,7 +2365,7 @@ function lr(t) {
             }
           }
       },
-      [p, r, Et, v, O, ae, be, ne],
+      [p, r, Et, v, O, ae, ye, ne],
     ),
     un = K(
       (e) => {
@@ -2381,7 +2381,7 @@ function lr(t) {
       },
       [Ct, fe],
     ),
-    ve = K(
+    be = K(
       (e) => {
         ne(e);
       },
@@ -2397,12 +2397,12 @@ function lr(t) {
     );
   at(
     () => (
-      window.addEventListener('mouseup', ve),
+      window.addEventListener('mouseup', be),
       () => {
-        window.removeEventListener('mouseup', ve);
+        window.removeEventListener('mouseup', be);
       }
     ),
-    [ve],
+    [be],
   );
   const hn = K(
       (e) => {
@@ -2514,7 +2514,7 @@ function lr(t) {
       },
       [p],
     ),
-    ke = K((e) => ct && mt.byId(e).$critical, [ct, mt]),
+    ve = K((e) => ct && mt.byId(e).$critical, [ct, mt]),
     He = K(
       (e) => {
         if (T?.auto) {
@@ -2547,7 +2547,7 @@ function lr(t) {
     onDragStart: (e) => (e.preventDefault(), !1),
     children: [
       /* @__PURE__ */ d(sr, {
-        onSelectLink: be,
+        onSelectLink: ye,
         selectedLink: Pt,
         readonly: r,
         linkShape: a,
@@ -2602,7 +2602,7 @@ function lr(t) {
             `wx-bar wx-${Ie(e.type)}` +
             (Ct && Et && e.id === Et.id ? ' wx-touch' : '') +
             (W && W.id === e.id ? ' wx-selected' : '') +
-            (ke(e.id) ? ' wx-critical' : '') +
+            (ve(e.id) ? ' wx-critical' : '') +
             (e.$reorder ? ' wx-reorder-task' : '') +
             (S && e.segments ? ' wx-split' : '') +
             (m ? ' wx-collision' : ''),
@@ -2611,15 +2611,15 @@ function lr(t) {
             (W ? ' wx-visible' : '') +
             (!W || (!de(e.id, !0) && He(e.id)) ? ' wx-target' : '') +
             (W && W.id === e.id && W.start ? ' wx-selected' : '') +
-            (ke(e.id) ? ' wx-critical' : ''),
+            (ve(e.id) ? ' wx-critical' : ''),
           $ =
             'wx-link wx-right' +
             (W ? ' wx-visible' : '') +
             (!W || (!de(e.id, !1) && He(e.id)) ? ' wx-target' : '') +
             (W && W.id === e.id && !W.start ? ' wx-selected' : '') +
-            (ke(e.id) ? ' wx-critical' : '');
+            (ve(e.id) ? ' wx-critical' : '');
         return /* @__PURE__ */ At(
-          pe,
+          Ce,
           {
             children: [
               !e.$skip &&
@@ -3361,7 +3361,7 @@ function rn(t) {
   };
 }
 const gr = (t, r, n, o) => t < o && r > n;
-function Ce(t) {
+function Me(t) {
   const r = t.start instanceof Date ? t.start.getTime() : 0;
   if (!r) return null;
   let n;
@@ -3387,12 +3387,12 @@ function pr(t, r) {
     s.forEach((i, l) => {
       const h = [],
         u = [...i].sort((g, a) => {
-          const y = Ce(g),
-            D = Ce(a);
+          const y = Me(g),
+            D = Me(a);
           return (y?.start ?? 0) - (D?.start ?? 0);
         });
       for (const g of u) {
-        const a = Ce(g);
+        const a = Me(g);
         if (!a) {
           n.set(g.id, 0);
           continue;
@@ -3765,7 +3765,7 @@ function br(t) {
   };
 }
 function vr(t, r) {
-  return typeof t == 'function' ? t : we(t, r);
+  return typeof t == 'function' ? t : pe(t, r);
 }
 function sn(t, r) {
   return t.map(({ format: n, ...o }) => ({
@@ -3775,12 +3775,12 @@ function sn(t, r) {
 }
 function kr(t, r) {
   const n = br(r);
-  for (let o in n) n[o] = we(n[o], t);
+  for (let o in n) n[o] = pe(n[o], t);
   return n;
 }
 function $r(t, r) {
   if (!t || !t.length) return t;
-  const n = we('%d-%m-%Y', r);
+  const n = pe('%d-%m-%Y', r);
   return t.map((o) =>
     o.template
       ? o
@@ -3879,9 +3879,9 @@ const Mr = (t) =>
     const Nt = st();
     Nt.current = Wt;
     const N = I(() => new Hn(Wn), []),
-      F = I(() => ({ ...De, ...ye }), []),
+      F = I(() => ({ ...De, ...xe }), []),
       W = Yt(Ut.i18n),
-      wt = I(() => (W ? W.extend(F, !0) : xe(F)), [W, F]),
+      wt = I(() => (W ? W.extend(F, !0) : we(F)), [W, F]),
       yt = I(() => wt.getRaw().calendar, [wt]),
       nt = I(() => {
         let Ct = {
@@ -4130,7 +4130,7 @@ const Mr = (t) =>
   });
 function Zr({ api: t = null, items: r = [] }) {
   const n = Yt(Ut.i18n),
-    o = I(() => n || xe(ye), [n]),
+    o = I(() => n || we(xe), [n]),
     s = I(() => o.getGroup('gantt'), [o]),
     i = qt(t, '_selected'),
     l = qt(t, 'undo'),
@@ -4211,7 +4211,7 @@ const Jr = je(function (
   const a = st(null),
     y = st(null),
     D = Yt(Ut.i18n),
-    z = I(() => D || xe({ ...ye, ...De }), [D]),
+    z = I(() => D || we({ ...xe, ...De }), [D]),
     B = I(() => z.getGroup('gantt'), [z]),
     p = qt(n, 'taskTypes'),
     L = qt(n, 'selected'),
@@ -4530,12 +4530,12 @@ function ts({
   hotkeys: a = {},
 }) {
   const y = Yt(Ut.i18n),
-    D = I(() => y || xe({ ...ye, ...De }), [y]),
+    D = I(() => y || we({ ...xe, ...De }), [y]),
     z = I(() => D.getGroup('gantt'), [D]),
     B = D.getRaw(),
     p = I(() => {
       const R = B.gantt?.dateFormat || B.formats?.dateFormat;
-      return we(R, B.calendar);
+      return pe(R, B.calendar);
     }, [B]),
     L = I(() => {
       if (h === !0 && !s) {
