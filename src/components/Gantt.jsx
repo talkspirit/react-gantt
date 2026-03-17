@@ -104,6 +104,11 @@ const Gantt = forwardRef(function Gantt(
     summaryBarCounts = false,
     marqueeSelect = false,
     copyPaste = false,
+    linkShape,
+    linkGradient = false,
+    linkStyle,
+    linkBundling = false,
+    showProgress = true,
     summary = null,
     _export = false,
     ...restProps
@@ -425,6 +430,11 @@ const Gantt = forwardRef(function Gantt(
           summaryBarCounts={summaryBarCounts}
           marqueeSelect={marqueeSelect}
           copyPaste={copyPaste}
+          linkShape={linkShape}
+          linkGradient={linkGradient}
+          linkStyle={linkStyle}
+          linkBundling={linkBundling}
+          showProgress={showProgress}
         />
       </StoreContext.Provider>
     </context.i18n.Provider>

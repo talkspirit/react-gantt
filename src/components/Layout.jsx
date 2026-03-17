@@ -11,10 +11,15 @@ import Grid from './grid/Grid.jsx';
 import Chart from './chart/Chart.jsx';
 import Resizer from './Resizer.jsx';
 import { modeObserver } from '../helpers/modeResizeObserver';
+import {
+  computeLanePacking,
+  computeAutoRowHeights,
+  mergeRowHeightOverrides,
+} from '../helpers/lanePacking';
 import storeContext from '../context';
 import { useStore } from '@svar-ui/lib-react';
 import './Layout.css';
-import { flushSync } from 'react-dom'
+import { flushSync } from 'react-dom';
 
 function Layout(props) {
   const {
@@ -31,6 +36,11 @@ function Layout(props) {
     summaryBarCounts = false,
     marqueeSelect = false,
     copyPaste = false,
+    linkShape,
+    linkGradient = false,
+    linkStyle,
+    linkBundling = false,
+    showProgress = true,
   } = props;
 
   const api = useContext(storeContext);
@@ -61,6 +71,34 @@ function Layout(props) {
 
     return { rowMap, taskRows };
   }, [rTasks, multiTaskRows, rowMapping]);
+
+  // Auto-compute row heights from lane packing when multiTaskRows is enabled.
+  // This ensures rows with overlapping tasks expand to fit all lanes.
+  const effectiveRowHeightOverrides = useMemo(() => {
+    if (!multiTaskRows || !computedRowMapping || !rTasks?.length) {
+      return rowHeightOverrides;
+    }
+
+    const { rowLaneCounts } = computeLanePacking(rTasks, computedRowMapping);
+
+    // Bar height = cellHeight - vertical padding SVAR applies.
+    // This matches Bars.jsx's bar sizing and the workspace formula.
+    const barHeight = rCellHeight - 6;
+
+    const autoOverrides = computeAutoRowHeights(
+      rowLaneCounts,
+      rCellHeight,
+      barHeight,
+    );
+
+    return mergeRowHeightOverrides(autoOverrides, rowHeightOverrides);
+  }, [
+    rTasks,
+    multiTaskRows,
+    computedRowMapping,
+    rCellHeight,
+    rowHeightOverrides,
+  ]);
 
   const [compactMode, setCompactMode] = useState(false);
   let [gridWidth, setGridWidth] = useState(0);
@@ -137,11 +175,19 @@ function Layout(props) {
       });
       height = 0;
       for (const rowId of seenRows) {
-        height += (rowHeightOverrides && rowHeightOverrides[rowId]) || rCellHeight;
+        height +=
+          (effectiveRowHeightOverrides && effectiveRowHeightOverrides[rowId]) ||
+          rCellHeight;
       }
     }
     return height + SCROLLBAR_PADDING;
-  }, [rTasks, rCellHeight, multiTaskRows, computedRowMapping, rowHeightOverrides]);
+  }, [
+    rTasks,
+    rCellHeight,
+    multiTaskRows,
+    computedRowMapping,
+    effectiveRowHeightOverrides,
+  ]);
   const scrollHeight = useMemo(
     () => rScales.height + fullHeight + scrollSize,
     [rScales, fullHeight, scrollSize],
@@ -345,7 +391,7 @@ function Layout(props) {
                   onTableAPIChange={onTableAPIChange}
                   multiTaskRows={multiTaskRows}
                   rowMapping={computedRowMapping}
-                  rowHeightOverrides={rowHeightOverrides}
+                  rowHeightOverrides={effectiveRowHeightOverrides}
                 />
                 <Resizer
                   value={gridWidth}
@@ -369,11 +415,16 @@ function Layout(props) {
                 onScaleClick={onScaleClick}
                 multiTaskRows={multiTaskRows}
                 rowMapping={computedRowMapping}
-                rowHeightOverrides={rowHeightOverrides}
+                rowHeightOverrides={effectiveRowHeightOverrides}
                 allowTaskIntersection={allowTaskIntersection}
                 summaryBarCounts={summaryBarCounts}
                 marqueeSelect={marqueeSelect}
                 copyPaste={copyPaste}
+                linkShape={linkShape}
+                linkGradient={linkGradient}
+                linkStyle={linkStyle}
+                linkBundling={linkBundling}
+                showProgress={showProgress}
               />
             </div>
           </div>

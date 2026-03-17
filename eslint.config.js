@@ -5,7 +5,14 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 
 export default [
   {
-    ignores: ['dist', 'dist-demos', 'dist-full', 'src/libs', 'vite.config.js'],
+    ignores: [
+      'dist',
+      'dist-demos',
+      'dist-full',
+      'src/libs',
+      'vite.config.js',
+      'storybook-static',
+    ],
   },
   {
     files: ['**/*.{js,jsx}'],
@@ -33,6 +40,7 @@ export default [
         performance: 'readonly',
         cancelAnimationFrame: 'readonly',
         CustomEvent: 'readonly',
+        MutationObserver: 'readonly',
       },
     },
     plugins: {

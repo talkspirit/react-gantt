@@ -32,10 +32,15 @@ const pixelToDate = (px, scales) => {
   const { start, lengthUnitWidth, lengthUnit } = scales;
   const msPerDay = 86400000;
   const daysPerUnit =
-    lengthUnit === 'week' ? 7 :
-    lengthUnit === 'month' ? 30 :
-    lengthUnit === 'quarter' ? 91 :
-    lengthUnit === 'year' ? 365 : 1;
+    lengthUnit === 'week'
+      ? 7
+      : lengthUnit === 'month'
+        ? 30
+        : lengthUnit === 'quarter'
+          ? 91
+          : lengthUnit === 'year'
+            ? 365
+            : 1;
   const units = Math.floor(px / lengthUnitWidth);
   const date = new Date(start.getTime() + units * daysPerUnit * msPerDay);
   date.setUTCHours(0, 0, 0, 0);
@@ -47,10 +52,15 @@ const getCellOffset = (date, baseDate, scales) => {
   const { lengthUnit } = scales;
   const msPerDay = 86400000;
   const daysPerUnit =
-    lengthUnit === 'week' ? 7 :
-    lengthUnit === 'month' ? 30 :
-    lengthUnit === 'quarter' ? 91 :
-    lengthUnit === 'year' ? 365 : 1;
+    lengthUnit === 'week'
+      ? 7
+      : lengthUnit === 'month'
+        ? 30
+        : lengthUnit === 'quarter'
+          ? 91
+          : lengthUnit === 'year'
+            ? 365
+            : 1;
   const msPerUnit = daysPerUnit * msPerDay;
   return Math.round((date.getTime() - baseDate.getTime()) / msPerUnit);
 };
@@ -60,10 +70,15 @@ const addCells = (date, cells, scales) => {
   const { lengthUnit } = scales;
   const msPerDay = 86400000;
   const daysPerUnit =
-    lengthUnit === 'week' ? 7 :
-    lengthUnit === 'month' ? 30 :
-    lengthUnit === 'quarter' ? 91 :
-    lengthUnit === 'year' ? 365 : 1;
+    lengthUnit === 'week'
+      ? 7
+      : lengthUnit === 'month'
+        ? 30
+        : lengthUnit === 'quarter'
+          ? 91
+          : lengthUnit === 'year'
+            ? 365
+            : 1;
   const msPerUnit = daysPerUnit * msPerDay;
   const result = new Date(date.getTime() + cells * msPerUnit);
   result.setUTCHours(0, 0, 0, 0);
@@ -81,6 +96,11 @@ function Bars(props) {
     summaryBarCounts = false,
     marqueeSelect = false,
     copyPaste = false,
+    linkShape,
+    linkGradient = false,
+    linkStyle,
+    linkBundling = false,
+    showProgress = true,
   } = props;
 
   const api = useContext(storeContext);
@@ -181,7 +201,8 @@ function Bars(props) {
     let cumulativeY = 0;
     for (const rowId of seenRows) {
       rowYOffsets.set(rowId, cumulativeY);
-      const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+      const rowH =
+        (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
       cumulativeY += rowH;
     }
 
@@ -194,15 +215,21 @@ function Bars(props) {
 
       // Hide summary bars that share a row with child tasks —
       // the individual task bars replace the summary visually.
+      // Also hide bars explicitly marked with barHidden.
       if (task.type === 'summary') {
         const childCount = (rowTasks.get(rowId) || []).length;
-        if (childCount > 0) {
+        if (childCount > 0 || task.barHidden) {
           return { ...task, $y: baseY, $skip: true };
         }
         // Vertically center within the row
-        const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+        const rowH =
+          (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
         const vPad = Math.max(0, Math.floor((rowH - task.$h) / 2));
-        return { ...task, $y: baseY + vPad, $y_base: task.$y_base !== undefined ? baseY + vPad : undefined };
+        return {
+          ...task,
+          $y: baseY + vPad,
+          $y_base: task.$y_base !== undefined ? baseY + vPad : undefined,
+        };
       }
 
       const laneCount = rowLaneCounts.get(rowId) || 1;
@@ -223,7 +250,8 @@ function Bars(props) {
       }
       // Single lane — center vertically like SVAR normally does.
       // Use Math.round to match SVAR's native centering as closely as possible.
-      const rowH = (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
+      const rowH =
+        (rowHeightOverrides && rowHeightOverrides[rowId]) || cellHeight;
       const vPad = Math.max(0, Math.round((rowH - task.$h) / 2));
       return {
         ...task,
@@ -231,7 +259,25 @@ function Bars(props) {
         $y_base: task.$y_base !== undefined ? baseY + vPad : undefined,
       };
     });
-  }, [tasks, multiTaskRows, rowMapping, rTasksValue, cellHeight, rowHeightOverrides]);
+  }, [
+    tasks,
+    multiTaskRows,
+    rowMapping,
+    rTasksValue,
+    cellHeight,
+    rowHeightOverrides,
+  ]);
+
+  // Build task position map for Links Y-adjustment in multiTaskRows mode.
+  // Maps task.id → { y, h } using the final bar positions from adjustedTasks.
+  const taskPositions = useMemo(() => {
+    if (!multiTaskRows || !adjustedTasks?.length) return null;
+    const m = new Map();
+    for (const t of adjustedTasks) {
+      if (!t.$skip) m.set(t.id, { y: t.$y, h: t.$h });
+    }
+    return m;
+  }, [multiTaskRows, adjustedTasks]);
 
   const lengthUnitWidth = useMemo(
     () => scalesValue.lengthUnitWidth,
@@ -266,7 +312,14 @@ function Bars(props) {
         for (let j = i + 1; j < rowTasks.length; j++) {
           const task1 = rowTasks[i];
           const task2 = rowTasks[j];
-          if (boundsOverlap(task1.$x, task1.$x + task1.$w, task2.$x, task2.$x + task2.$w)) {
+          if (
+            boundsOverlap(
+              task1.$x,
+              task1.$x + task1.$w,
+              task2.$x,
+              task2.$x + task2.$w,
+            )
+          ) {
             overlapping.add(task1.id);
             overlapping.add(task2.id);
           }
@@ -275,11 +328,18 @@ function Bars(props) {
     });
 
     return overlapping;
-  }, [allowTaskIntersection, multiTaskRows, rowMapping, rTasksValue, rTasksCounter]);
+  }, [
+    allowTaskIntersection,
+    multiTaskRows,
+    rowMapping,
+    rTasksValue,
+    rTasksCounter,
+  ]);
 
   // ── Summary Bar Counts ──────────────────────────────────────────
   const summaryColCounts = useMemo(() => {
-    if (!summaryBarCounts || !rTasksValue?.length || !lengthUnitWidth) return null;
+    if (!summaryBarCounts || !rTasksValue?.length || !lengthUnitWidth)
+      return null;
 
     const childrenMap = new Map();
     const summaryIds = new Set();
@@ -333,6 +393,11 @@ function Bars(props) {
   const ignoreNextClickRef = useRef(false);
 
   const [linkFrom, setLinkFrom] = useState(undefined);
+  const linkFromRef = useRef(null);
+  const linkDragStartRef = useRef(null); // { clientX, clientY } initial mousedown
+  const linkDragActiveRef = useRef(false); // true once drag threshold exceeded
+  const linkDragRef = useRef(null); // { x, y } cursor position during link drag
+  const [linkDragPos, setLinkDragPos] = useState(null);
   const [taskMove, setTaskMove] = useState(null);
   const progressFromRef = useRef(null);
 
@@ -460,7 +525,12 @@ function Bars(props) {
         const taskAbsoluteY = taskYPositions.get(task.id) ?? task.$y;
         const taskTop = taskAbsoluteY;
         const taskBottom = taskTop + task.$h;
-        return taskLeft < maxX && taskRight > minX && taskTop < maxY && taskBottom > minY;
+        return (
+          taskLeft < maxX &&
+          taskRight > minX &&
+          taskTop < maxY &&
+          taskBottom > minY
+        );
       });
     },
     [rTasksValue, taskYPositions],
@@ -473,26 +543,39 @@ function Bars(props) {
     if (!selected || !selected.length) return;
 
     const msPerDay = 86400000;
-    const copiedTasks = selected.map((sel) => {
-      const task = api.getTask(sel.id);
-      if (!task) return null;
-      const renderedTask = rTasksValue.find(t => t.id === sel.id);
-      if (!renderedTask) return null;
-      const { $x, $y, $h, $w, $skip, $level, ...clean } = renderedTask;
-      const durationDays = renderedTask.end && renderedTask.start
-        ? Math.round((renderedTask.end.getTime() - renderedTask.start.getTime()) / msPerDay)
-        : 0;
-      const startDayOfWeek = renderedTask.start
-        ? (renderedTask.start.getUTCDay() + 6) % 7
-        : 0;
-      return { ...clean, _durationDays: durationDays, _startDayOfWeek: startDayOfWeek, _originalWidth: $w, _originalHeight: $h };
-    }).filter(Boolean);
+    const copiedTasks = selected
+      .map((sel) => {
+        const task = api.getTask(sel.id);
+        if (!task) return null;
+        const renderedTask = rTasksValue.find((t) => t.id === sel.id);
+        if (!renderedTask) return null;
+        // eslint-disable-next-line no-unused-vars
+        const { $x, $y, $h, $w, $skip, $level, ...clean } = renderedTask;
+        const durationDays =
+          renderedTask.end && renderedTask.start
+            ? Math.round(
+                (renderedTask.end.getTime() - renderedTask.start.getTime()) /
+                  msPerDay,
+              )
+            : 0;
+        const startDayOfWeek = renderedTask.start
+          ? (renderedTask.start.getUTCDay() + 6) % 7
+          : 0;
+        return {
+          ...clean,
+          _durationDays: durationDays,
+          _startDayOfWeek: startDayOfWeek,
+          _originalWidth: $w,
+          _originalHeight: $h,
+        };
+      })
+      .filter(Boolean);
 
     if (!copiedTasks.length) return;
 
     const firstTask = copiedTasks[0];
     const commonParent = firstTask.parent;
-    const validTasks = copiedTasks.filter(t => t.parent === commonParent);
+    const validTasks = copiedTasks.filter((t) => t.parent === commonParent);
     if (validTasks.length === 0) return;
 
     const baseDate = validTasks.reduce((min, t) => {
@@ -500,7 +583,7 @@ function Bars(props) {
       return !min || t.start < min ? t.start : min;
     }, null);
 
-    clipboardTasks = validTasks.map(t => ({
+    clipboardTasks = validTasks.map((t) => ({
       ...t,
       _startCellOffset: getCellOffset(t.start, baseDate, scalesValue),
     }));
@@ -509,43 +592,54 @@ function Bars(props) {
   }, [copyPaste, api, rTasksValue, scalesValue]);
 
   // ── Copy-Paste: runPaste ──
-  const runPaste = useCallback((targetDate, pastedTasks, parent) => {
-    if (!pastedTasks.length || !targetDate) return;
-    if (parent === undefined || parent === null) return;
+  const runPaste = useCallback(
+    (targetDate, pastedTasks, parent) => {
+      if (!pastedTasks.length || !targetDate) return;
+      if (parent === undefined || parent === null) return;
 
-    const msPerDay = 86400000;
-    const history = api.getHistory();
-    history?.startBatch();
+      const msPerDay = 86400000;
+      const history = api.getHistory();
+      history?.startBatch();
 
-    const targetColumnStart = new Date(targetDate);
-    targetColumnStart.setUTCHours(0, 0, 0, 0);
+      const targetColumnStart = new Date(targetDate);
+      targetColumnStart.setUTCHours(0, 0, 0, 0);
 
-    pastedTasks.forEach((task, i) => {
-      const newId = `task-${Date.now()}-${i}`;
-      const cellOffset = addCells(targetColumnStart, task._startCellOffset || 0, scalesValue);
-      const newStart = new Date(cellOffset.getTime() + (task._startDayOfWeek || 0) * msPerDay);
-      newStart.setUTCHours(0, 0, 0, 0);
-      const newEnd = new Date(newStart.getTime() + (task._durationDays || 7) * msPerDay);
-      newEnd.setUTCHours(0, 0, 0, 0);
+      pastedTasks.forEach((task, i) => {
+        const newId = `task-${Date.now()}-${i}`;
+        const cellOffset = addCells(
+          targetColumnStart,
+          task._startCellOffset || 0,
+          scalesValue,
+        );
+        const newStart = new Date(
+          cellOffset.getTime() + (task._startDayOfWeek || 0) * msPerDay,
+        );
+        newStart.setUTCHours(0, 0, 0, 0);
+        const newEnd = new Date(
+          newStart.getTime() + (task._durationDays || 7) * msPerDay,
+        );
+        newEnd.setUTCHours(0, 0, 0, 0);
 
-      api.exec('add-task', {
-        task: {
-          id: newId,
-          text: task.text,
-          start: newStart,
-          end: newEnd,
-          type: task.type || 'task',
-          parent: parent,
-          row: task.row,
-        },
-        target: parent,
-        mode: 'child',
-        skipUndo: i > 0,
+        api.exec('add-task', {
+          task: {
+            id: newId,
+            text: task.text,
+            start: newStart,
+            end: newEnd,
+            type: task.type || 'task',
+            parent: parent,
+            row: task.row,
+          },
+          target: parent,
+          mode: 'child',
+          skipUndo: i > 0,
+        });
       });
-    });
 
-    history?.endBatch();
-  }, [api, scalesValue]);
+      history?.endBatch();
+    },
+    [api, scalesValue],
+  );
 
   // ── Copy-Paste: hotkey intercept (Ctrl+C / Ctrl+V) ──
   useEffect(() => {
@@ -611,6 +705,7 @@ function Bars(props) {
       const css = point.target.classList;
       if (point.target.closest('.wx-delete-button')) return;
       if (point.target.closest('[data-interactive]')) return;
+      if (css.contains('wx-link') || point.target.closest('.wx-link')) return;
       if (!readonly) {
         if (css.contains('wx-progress-marker')) {
           const { progress } = api.getTask(id);
@@ -693,14 +788,20 @@ function Bars(props) {
       // Bulk move: drag one of the selected tasks to move all of them
       if (node && marqueeSelect && !readonly && selectedValue.length > 1) {
         const id = getID(node);
-        const isSelected = selectedValue.some(s => s.id === id);
+        const isSelected = selectedValue.some((s) => s.id === id);
         if (isSelected) {
           setBulkMove({
             startX: e.clientX,
-            ids: selectedValue.map(s => s.id),
-            tasks: selectedValue.map(s => {
+            ids: selectedValue.map((s) => s.id),
+            tasks: selectedValue.map((s) => {
               const t = api.getTask(s.id);
-              return { id: s.id, start: t.start, end: t.end, $x: t.$x, $w: t.$w };
+              return {
+                id: s.id,
+                start: t.start,
+                end: t.end,
+                $x: t.$x,
+                $w: t.$w,
+              };
             }),
           });
           startDrag();
@@ -708,11 +809,50 @@ function Bars(props) {
         }
       }
 
+      // Link handle interaction
+      if (!readonly && (e.target.classList.contains('wx-link') || e.target.classList.contains('wx-inner'))) {
+        // If linkFrom is already set, we're in click-based flow waiting for
+        // the second click — return early so onClick handles it (don't start
+        // a task drag via down()).
+        if (linkFromRef.current) return;
+
+        const linkEl = e.target.classList.contains('wx-link')
+          ? e.target
+          : e.target.closest('.wx-link');
+        if (linkEl) {
+          const id = locateID(linkEl);
+          if (id) {
+            const toStart = linkEl.classList.contains('wx-left');
+            const lf = { id, start: toStart };
+            setLinkFrom(lf);
+            linkFromRef.current = lf;
+            linkDragStartRef.current = { clientX: e.clientX, clientY: e.clientY };
+            linkDragActiveRef.current = false;
+            // Skip the click event from this mousedown — linkFrom is already
+            // set via state; without this, onClick sees linkFrom as set and
+            // treats it as a second click on the same handle, clearing it.
+            ignoreNextClickRef.current = true;
+            startDrag();
+            return;
+          }
+        }
+      }
+
       if (!node) return;
 
       down(node, e);
     },
-    [down, marqueeSelect, copyPaste, readonly, pastePreview, scalesValue, selectedValue, api, startDrag],
+    [
+      down,
+      marqueeSelect,
+      copyPaste,
+      readonly,
+      pastePreview,
+      scalesValue,
+      selectedValue,
+      api,
+      startDrag,
+    ],
   );
 
   const touchstart = useCallback(
@@ -728,11 +868,86 @@ function Bars(props) {
     [down],
   );
 
+  const types = ['e2s', 's2s', 'e2e', 's2e'];
+  const getLinkType = useCallback((fromStart, toStart) => {
+    return types[(fromStart ? 1 : 0) + (toStart ? 0 : 2)];
+  }, []);
+
+  const alreadyLinked = useCallback(
+    (target, toStart) => {
+      const source = linkFrom.id;
+      const fromStart = linkFrom.start;
+
+      if (target === source) return true;
+
+      return !!rLinksValue.find((l) => {
+        return (
+          l.target == target &&
+          l.source == source &&
+          l.type === getLinkType(fromStart, toStart)
+        );
+      });
+    },
+    [linkFrom, rLinksCounter, getLinkType],
+  );
+
   const onSelectLink = useCallback((id) => {
     setSelectedLinkId(id);
   }, []);
 
-  const up = useCallback(() => {
+  const up = useCallback((e) => {
+    // Handle link handle mouseup
+    if (linkDragStartRef.current) {
+      const wasDragging = linkDragActiveRef.current;
+      linkDragStartRef.current = null;
+      linkDragActiveRef.current = false;
+      linkDragRef.current = null;
+      setLinkDragPos(null);
+      endDrag();
+
+      if (wasDragging) {
+        // Drag completed: find target under cursor and create link
+        const lf = linkFromRef.current;
+        const point = e || window.event;
+        const el = point
+          ? document.elementFromPoint(point.clientX, point.clientY)
+          : null;
+        if (el && lf) {
+          const linkEl = el.classList.contains('wx-link')
+            ? el
+            : el.closest('.wx-link');
+          if (linkEl) {
+            const targetId = locateID(linkEl);
+            const toStart = linkEl.classList.contains('wx-left');
+            if (targetId && targetId !== lf.id) {
+              const linkType = getLinkType(lf.start, toStart);
+              const isDuplicate = rLinksValue.find(
+                (l) =>
+                  l.target == targetId &&
+                  l.source == lf.id &&
+                  l.type === linkType,
+              );
+              if (!isDuplicate) {
+                api.exec('add-link', {
+                  link: {
+                    source: lf.id,
+                    target: targetId,
+                    type: linkType,
+                  },
+                });
+              }
+            }
+          }
+        }
+        // Clear link source after drag
+        setLinkFrom(null);
+        linkFromRef.current = null;
+        ignoreNextClickRef.current = true;
+      }
+      // If not dragging: keep linkFrom active for click-based flow
+      return;
+    }
+
     // Handle marquee selection finalization
     const currentMarquee = marqueeRef.current;
     if (currentMarquee) {
@@ -764,6 +979,7 @@ function Bars(props) {
 
     // Handle bulk move finalization
     if (bulkMove) {
+      // eslint-disable-next-line no-unused-vars
       const { ids, tasks: origTasks, startX } = bulkMove;
       setBulkMove(null);
       endDrag();
@@ -808,10 +1024,15 @@ function Bars(props) {
           // Calculate new dates directly instead of relying on store diff
           const msPerDay = 24 * 60 * 60 * 1000;
           const daysPerUnit =
-            lengthUnit === 'week' ? 7 :
-            lengthUnit === 'month' ? 30 :
-            lengthUnit === 'quarter' ? 91 :
-            lengthUnit === 'year' ? 365 : 1;
+            lengthUnit === 'week'
+              ? 7
+              : lengthUnit === 'month'
+                ? 30
+                : lengthUnit === 'quarter'
+                  ? 91
+                  : lengthUnit === 'year'
+                    ? 365
+                    : 1;
           const diffMs = diff * daysPerUnit * msPerDay;
 
           if (mode === 'move') {
@@ -836,11 +1057,27 @@ function Bars(props) {
 
       endDrag();
     }
-  }, [api, endDrag, taskMove, lengthUnitWidth, lengthUnit]);
+  }, [api, endDrag, taskMove, lengthUnitWidth, lengthUnit, getLinkType, rLinksValue]);
 
   const move = useCallback(
     (e, point) => {
       const { clientX } = point;
+
+      // Link drag: activate after 5px threshold, then track cursor
+      if (linkDragStartRef.current && containerRef.current) {
+        const ds = linkDragStartRef.current;
+        const dx = clientX - ds.clientX;
+        const dy = point.clientY - ds.clientY;
+        if (!linkDragActiveRef.current) {
+          if (Math.abs(dx) + Math.abs(dy) < 5) return; // below threshold
+          linkDragActiveRef.current = true;
+        }
+        const rect = containerRef.current.getBoundingClientRect();
+        const pos = { x: clientX - rect.left, y: point.clientY - rect.top };
+        linkDragRef.current = pos;
+        setLinkDragPos(pos);
+        return;
+      }
 
       // Track mouse position for copy-paste feature
       if (copyPaste && containerRef.current) {
@@ -851,7 +1088,9 @@ function Bars(props) {
       // Update paste preview position
       if (pastePreview && containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
-        setPastePreview(prev => prev ? { ...prev, currentX: clientX - rect.left } : null);
+        setPastePreview((prev) =>
+          prev ? { ...prev, currentX: clientX - rect.left } : null,
+        );
       }
 
       // Handle marquee selection drag
@@ -897,11 +1136,11 @@ function Bars(props) {
           const { mode, l, w, x, id, start, segment, index } = taskMove;
           const task = api.getTask(id);
           const dx = clientX - x;
-          const minWidth = Math.round(lengthUnitWidth) || 1; 
+          const minWidth = Math.round(lengthUnitWidth) || 1;
           if (
             (!start && Math.abs(dx) < 20) ||
-            (mode === "start" && w - dx < minWidth) ||
-            (mode === "end" && w + dx < minWidth) || 
+            (mode === 'start' && w - dx < minWidth) ||
+            (mode === 'end' && w + dx < minWidth) ||
             (mode === 'move' &&
               ((dx < 0 && l + dx < 0) ||
                 (dx > 0 && l + w + dx > totalWidth))) ||
@@ -987,17 +1226,17 @@ function Bars(props) {
     [touched, move],
   );
 
-  const mouseup = useCallback(() => {
-    up();
+  const mouseup = useCallback((e) => {
+    up(e);
   }, [up]);
 
-  const touchend = useCallback(() => {
+  const touchend = useCallback((e) => {
     setTouched(null);
     if (touchTimerRef.current) {
       clearTimeout(touchTimerRef.current);
       touchTimerRef.current = null;
     }
-    up();
+    up(e);
   }, [up]);
 
   useEffect(() => {
@@ -1024,32 +1263,10 @@ function Bars(props) {
     [api, readonly],
   );
 
-  const types = ['e2s', 's2s', 'e2e', 's2e'];
-  const getLinkType = useCallback((fromStart, toStart) => {
-    return types[(fromStart ? 1 : 0) + (toStart ? 0 : 2)];
-  }, []);
-
-  const alreadyLinked = useCallback(
-    (target, toStart) => {
-      const source = linkFrom.id;
-      const fromStart = linkFrom.start;
-
-      if (target === source) return true;
-
-      return !!rLinksValue.find((l) => {
-        return (
-          l.target == target &&
-          l.source == source &&
-          l.type === getLinkType(fromStart, toStart)
-        );
-      });
-    },
-    [linkFrom, rLinksCounter, getLinkType],
-  );
-
   const removeLinkMarker = useCallback(() => {
     if (linkFrom) {
       setLinkFrom(null);
+      linkFromRef.current = null;
     }
   }, [linkFrom]);
 
@@ -1078,7 +1295,9 @@ function Bars(props) {
         if (css.contains('wx-link')) {
           const toStart = css.contains('wx-left');
           if (!linkFrom) {
-            setLinkFrom({ id, start: toStart });
+            const lf = { id, start: toStart };
+            setLinkFrom(lf);
+            linkFromRef.current = lf;
             return;
           }
 
@@ -1091,6 +1310,8 @@ function Bars(props) {
               },
             });
           }
+          setLinkFrom(null);
+          linkFromRef.current = null;
         } else if (css.contains('wx-delete-button-icon')) {
           api.exec('delete-link', { id: selectedLinkId });
           setSelectedLinkId(null);
@@ -1206,7 +1427,9 @@ function Bars(props) {
   return (
     <div
       className="wx-GKbcLEGA wx-bars"
-      style={{ lineHeight: `${adjustedTasks.length ? adjustedTasks[0].$h : 0}px` }}
+      style={{
+        lineHeight: `${adjustedTasks.length ? adjustedTasks[0].$h : 0}px`,
+      }}
       ref={containerRef}
       onContextMenu={contextmenu}
       onMouseDown={mousedown}
@@ -1225,7 +1448,50 @@ function Bars(props) {
         onSelectLink={onSelectLink}
         selectedLink={selectedLink}
         readonly={readonly}
+        linkShape={linkShape}
+        linkGradient={linkGradient}
+        linkStyle={linkStyle}
+        linkBundling={linkBundling}
+        multiTaskRows={multiTaskRows}
+        taskPositions={taskPositions}
+        cellHeight={cellHeight}
       />
+      {linkFrom && linkDragPos && (() => {
+        const sourceTask = api.getTask(linkFrom.id);
+        if (!sourceTask) return null;
+        const sx = linkFrom.start ? sourceTask.$x : sourceTask.$x + sourceTask.$w;
+        const sy = sourceTask.$y + (sourceTask.$h || cellHeight) / 2;
+        return (
+          <svg
+            className="wx-link-preview"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              pointerEvents: 'none',
+              zIndex: 5,
+            }}
+          >
+            <line
+              x1={sx}
+              y1={sy}
+              x2={linkDragPos.x}
+              y2={linkDragPos.y}
+              stroke="var(--wx-gantt-link-color)"
+              strokeWidth={2}
+              strokeDasharray="6 3"
+            />
+            <circle
+              cx={linkDragPos.x}
+              cy={linkDragPos.y}
+              r={4}
+              fill="var(--wx-gantt-link-color)"
+            />
+          </svg>
+        );
+      })()}
       {adjustedTasks.map((task) => {
         if (task.$skip && task.$skip_baseline) return null;
         const isOverlapping = overlappingTaskIds.has(task.id);
@@ -1241,7 +1507,7 @@ function Bars(props) {
           'wx-link wx-left' +
           (linkFrom ? ' wx-visible' : '') +
           (!linkFrom ||
-            (!alreadyLinked(task.id, true) && isLinkMarkerVisible(task.id))
+          (!alreadyLinked(task.id, true) && isLinkMarkerVisible(task.id))
             ? ' wx-target'
             : '') +
           (linkFrom && linkFrom.id === task.id && linkFrom.start
@@ -1252,7 +1518,7 @@ function Bars(props) {
           'wx-link wx-right' +
           (linkFrom ? ' wx-visible' : '') +
           (!linkFrom ||
-            (!alreadyLinked(task.id, false) && isLinkMarkerVisible(task.id))
+          (!alreadyLinked(task.id, false) && isLinkMarkerVisible(task.id))
             ? ' wx-target'
             : '') +
           (linkFrom && linkFrom.id === task.id && !linkFrom.start
@@ -1271,7 +1537,7 @@ function Bars(props) {
               >
                 {!readonly ? (
                   task.id === selectedLink?.target &&
-                    selectedLink?.type[2] === 's' ? (
+                  selectedLink?.type[2] === 's' ? (
                     <Button
                       type="danger"
                       css="wx-left wx-delete-button wx-delete-link"
@@ -1287,7 +1553,7 @@ function Bars(props) {
 
                 {task.type !== 'milestone' ? (
                   <>
-                    {task.progress && !(splitTasks && task.segments) ? (
+                    {showProgress && task.progress && !(splitTasks && task.segments) ? (
                       <div className="wx-GKbcLEGA wx-progress-wrapper">
                         <div
                           className="wx-GKbcLEGA wx-progress-percent"
@@ -1295,9 +1561,10 @@ function Bars(props) {
                         ></div>
                       </div>
                     ) : null}
-                    {!readonly &&
-                      !(splitTasks && task.segments) &&
-                      !(task.type == 'summary' && summary?.autoProgress) ? (
+                    {showProgress &&
+                    !readonly &&
+                    !(splitTasks && task.segments) &&
+                    !(task.type == 'summary' && summary?.autoProgress) ? (
                       <div
                         className="wx-GKbcLEGA wx-progress-marker"
                         style={{ left: `calc(${task.progress}% - 10px)` }}
@@ -1307,7 +1574,11 @@ function Bars(props) {
                     ) : null}
                     {TaskTemplate ? (
                       <div className="wx-GKbcLEGA wx-content">
-                        <TaskTemplate data={task} api={api} onAction={forward} />
+                        <TaskTemplate
+                          data={task}
+                          api={api}
+                          onAction={forward}
+                        />
                       </div>
                     ) : splitTasks && task.segments ? (
                       <BarSegments task={task} type={taskTypeCss(task.type)} />
@@ -1330,7 +1601,7 @@ function Bars(props) {
 
                 {!readonly ? (
                   task.id === selectedLink?.target &&
-                    selectedLink?.type[2] === 'e' ? (
+                  selectedLink?.type[2] === 'e' ? (
                     <Button
                       type="danger"
                       css="wx-right wx-delete-button wx-delete-link"
@@ -1345,42 +1616,49 @@ function Bars(props) {
                 ) : null}
 
                 {isOverlapping && (
-                  <div className="wx-GKbcLEGA wx-collision-warning" title="This task overlaps with another task in the same row">
+                  <div
+                    className="wx-GKbcLEGA wx-collision-warning"
+                    title="This task overlaps with another task in the same row"
+                  >
                     !
                   </div>
                 )}
 
-                {summaryColCounts && task.type === 'summary' && (() => {
-                  const colCounts = summaryColCounts.get(task.id);
-                  const startCol = Math.floor(task.$x / lengthUnitWidth);
-                  const endCol = Math.ceil((task.$x + task.$w) / lengthUnitWidth);
-                  return (
-                    <div className="wx-GKbcLEGA wx-summary-week-counts">
-                      {Array.from({ length: endCol - startCol }, (_, i) => {
-                        const col = startCol + i;
-                        const count = colCounts?.get(col) || 0;
-                        return (
-                          <span
-                            key={col}
-                            className={`wx-GKbcLEGA wx-week-count${count === 0 ? ' wx-week-count-zero' : ''}`}
-                            style={{
-                              position: 'absolute',
-                              left: `${col * lengthUnitWidth - task.$x}px`,
-                              width: `${lengthUnitWidth}px`,
-                              top: 0,
-                              height: '100%',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            {count}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                {summaryColCounts &&
+                  task.type === 'summary' &&
+                  (() => {
+                    const colCounts = summaryColCounts.get(task.id);
+                    const startCol = Math.floor(task.$x / lengthUnitWidth);
+                    const endCol = Math.ceil(
+                      (task.$x + task.$w) / lengthUnitWidth,
+                    );
+                    return (
+                      <div className="wx-GKbcLEGA wx-summary-week-counts">
+                        {Array.from({ length: endCol - startCol }, (_, i) => {
+                          const col = startCol + i;
+                          const count = colCounts?.get(col) || 0;
+                          return (
+                            <span
+                              key={col}
+                              className={`wx-GKbcLEGA wx-week-count${count === 0 ? ' wx-week-count-zero' : ''}`}
+                              style={{
+                                position: 'absolute',
+                                left: `${col * lengthUnitWidth - task.$x}px`,
+                                width: `${lengthUnitWidth}px`,
+                                top: 0,
+                                height: '100%',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              {count}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
               </div>
             )}
             {baselinesValue && !task.$skip_baseline ? (
@@ -1397,24 +1675,32 @@ function Bars(props) {
       })}
 
       {/* Marquee selection rectangle */}
-      {marquee && (() => {
-        const left = Math.min(marquee.startX, marquee.currentX);
-        const top = Math.min(marquee.startY, marquee.currentY);
-        const width = Math.abs(marquee.currentX - marquee.startX);
-        const height = Math.abs(marquee.currentY - marquee.startY);
-        return (
-          <div
-            className="wx-GKbcLEGA wx-marquee-selection"
-            style={{ left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px` }}
-          />
-        );
-      })()}
+      {marquee &&
+        (() => {
+          const left = Math.min(marquee.startX, marquee.currentX);
+          const top = Math.min(marquee.startY, marquee.currentY);
+          const width = Math.abs(marquee.currentX - marquee.startX);
+          const height = Math.abs(marquee.currentY - marquee.startY);
+          return (
+            <div
+              className="wx-GKbcLEGA wx-marquee-selection"
+              style={{
+                left: `${left}px`,
+                top: `${top}px`,
+                width: `${width}px`,
+                height: `${height}px`,
+              }}
+            />
+          );
+        })()}
 
       {/* Paste preview ghost tasks */}
-      {pastePreview && pastePreview.currentX != null && (
+      {pastePreview &&
+        pastePreview.currentX != null &&
         pastePreview.tasks.map((task, i) => {
           const cellIndex = Math.floor(pastePreview.currentX / lengthUnitWidth);
-          const x = (cellIndex + (task._startCellOffset || 0)) * lengthUnitWidth;
+          const x =
+            (cellIndex + (task._startCellOffset || 0)) * lengthUnitWidth;
           const w = task._originalWidth || lengthUnitWidth;
           const h = task._originalHeight || cellHeight;
           const rowY = rowYPositions.get(task.row) ?? (task.$y || 0);
@@ -1424,11 +1710,12 @@ function Bars(props) {
               className="wx-GKbcLEGA wx-bar wx-task wx-paste-preview"
               style={{ left: x, top: rowY, width: w, height: h }}
             >
-              <div className="wx-GKbcLEGA wx-content">{task.$barText || task.text}</div>
+              <div className="wx-GKbcLEGA wx-content">
+                {task.$barText || task.text}
+              </div>
             </div>
           );
-        })
-      )}
+        })}
     </div>
   );
 }
